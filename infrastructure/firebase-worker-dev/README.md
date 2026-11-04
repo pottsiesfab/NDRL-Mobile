@@ -1,32 +1,53 @@
-# NDRL Firebase Manual Test Worker (development only)
+# NDRL DEV FCM queue - milestone 4I.5 (guarded manual prototype)
 
-No general queue processing. No ports exposed. Only `device_id=2` and project `ndrl-notifications-dev` are accepted by the code.
+* Does **not** replace the known-good `worker.php` and `compose.yaml`.
+* No service or cron. Single explicit invocation processes **up to one delivery**.
+* Hardcoded Firebase project: `ndrl-notifications-dev`.
+* Hardcoded device: `2`; event: `14`; historic messages `<=8` excluded.
+* Class and event audiences only. News and other events intentionally deferred.
+* Subscriptions and event mutes checked at enqueue and **again before send**.
+* A `processing` delivery is deliberately not auto-replayed; a crash after Firebase acceptance creates ambiguous delivery outcome. Review such rows manually.
+* Retriable explicit HTTP errors: 408/429/5xx, up to three attempts with backoff; unknown transport errors leave delivery in processing for manual review.
+* FCM 200 signifies **acceptance**, not guaranteed display.
 
-## Install and configure on ndrlsite
+## Installation
 
-Unzip folder into `/srv/ndrl/firebase-worker-dev` (outside `/srv/ndrl/dev` and `/srv/ndrl/prod`).
+Copy these five files into `/srv/ndrl/firebase-worker-dev` (without deleting old files).
+Run `sudo bash setup-queue-db-user.sh` once, then `sudo docker compose -f compose.queue.yaml build queue`.
 
-1. Verify Firebase key exists at `/srv/ndrl-data/private/firebase/dev/service-account.json`, with expected project. Parent directories stay root-only.
-2. `cd /srv/ndrl/firebase-worker-dev`
-3. `sudo bash setup-db-user.sh` (creates a restricted MariaDB user, root-readable worker.env, and group-readable key for UID/GID 20070).
-4. `sudo docker compose build worker`
-5. `sudo docker compose run --rm worker check` — safe preflight only.
-6. **Only after verifying** the key, device, and project: `sudo docker compose run --rm worker send-test 2 --confirm`.
+## Subscription
 
-Note: On Docker Compose, `run` overrides the image CMD but preserves ENTRYPOINT, allowing the two supported commands.
+Run on DEV only:
 
-The returned FCM `name` means Google accepted the request, not necessarily that Android displayed it. To see a system notification, background the app on the emulator first (Home button). Foreground messages may be delivered only to the app's onMessage handler.
+```bash
+docker exec -i dev-db-1 sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD" ndrl_fantasy' <<'SQL'
+INSERT INTO notify_subscriptions (device_id, subscription_type, class_id, is_enabled)
+VALUES (2, 'class', 1, 1)
+ON DUPLICATE KEY UPDATE is_enabled=1;
+SELECT device_id, subscription_type, class_id, is_enabled
+FROM notify_subscriptions WHERE device_id=2;
+SQL
+```
 
-## Security
+## Verify
 
-- Existing parent `/srv/ndrl-data/private` ACLs are not changed.
-- Firebase service-account key is bind-mounted **read-only** into only the worker, not Apache.
-- Host file is root:20070 0640; directories remain root-only (2700/0700). UID 20070 runs the container.
-- Worker env is root:root 0600; use `sudo docker compose` to read it.
-- The Docker group is root-equivalent; only trusted VPS admins should have Docker access.
-- Worker DB account is SELECT-limited to four columns of `ndrl_fantasy.notify_devices`.
-- No delivery records, subscriptions, or staging records are modified.
-- No automated scheduler or restart policy; each send must be manually invoked.
-- The test device token is a sensitive identifier; don't paste it into logs/chats.
+```bash
+cd /srv/ndrl/firebase-worker-dev
+sudo docker compose -f compose.queue.yaml run --rm queue inspect
+```
 
-For production, plan a proper database-backed queue worker, rate limiting, idempotency, token revocation handling, and more robust FCM error classification.
+Then create and **publish a new** message for DEV event 14 and Pro 7.0 (class ID 1) through the DEV Race Control UI. Only IDs > 8 qualify. From the VPS:
+
+```bash
+sudo docker compose -f compose.queue.yaml run --rm queue run-once --confirm
+```
+
+One delivery is processed per invocation. Nothing is scheduled. A new message published while device 2 is unsubscribed will be completed with no recipients (by design for this test scope).
+
+## Inspect results
+
+```bash
+docker exec dev-db-1 sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD" ndrl_fantasy -e "SELECT message_id, status, queued_at, sent_at FROM notify_messages WHERE message_id > 8 ORDER BY message_id DESC LIMIT 10; SELECT delivery_id, message_id, device_id, status, attempts, provider_message_id, last_error FROM notify_deliveries WHERE device_id = 2 ORDER BY delivery_id DESC LIMIT 10;"'
+```
+
+**Important:** This is a guarded development prototype, *not* the final multi-device production queue. In production we will replace the hardcoded recipient, use robust worker leasing/recovery and true queue orchestration, and define policy for ambiguous delivery outcomes.
