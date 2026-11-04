@@ -1,0 +1,25 @@
+name: ndrl-fcm-test
+services:
+  worker:
+    build: .
+    image: ndrl-fcm-test:local
+    restart: "no"
+    user: "20070:20070"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    env_file:
+      - /srv/ndrl-data/private/firebase/dev/worker.env
+    environment:
+      FIREBASE_PROJECT_ID: ndrl-notifications-dev
+      FIREBASE_CREDENTIALS: /run/secrets/firebase-service-account.json
+      ALLOWED_DEVICE_ID: "2"
+    volumes:
+      - /srv/ndrl-data/private/firebase/dev/service-account.json:/run/secrets/firebase-service-account.json:ro
+    networks:
+      - ndrl_dev
+networks:
+  ndrl_dev:
+    external: true
+    name: dev_ndrl_net
