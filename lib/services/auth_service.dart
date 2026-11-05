@@ -126,6 +126,118 @@ class AuthService extends ChangeNotifier {
     _notify();
   }
 
+  /// Authenticated read-only member profile request. Refresh once on HTTP 401.
+  Future<Map<String, dynamic>> loadMemberProfile() async {
+    if (_access == null) {
+      if (_refresh == null) throw const AuthException('Please sign in');
+      await refresh();
+    }
+    Future<http.Response> fetch() => _http.get(
+      Uri.parse('https://dev.nostalgiadragleague.com/api/mobile_profile_api.php?action=me'),
+      headers: {'Accept': 'application/json', 'Authorization': 'Bearer $_access'},
+    ).timeout(const Duration(seconds: 20));
+    try {
+      var response = await fetch();
+      if (response.statusCode == 401) {
+        await refresh();
+        response = await fetch();
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const AuthException('Unexpected profile response');
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300 || decoded['success'] != true) {
+        throw AuthException(decoded['error'] is String
+            ? decoded['error'] as String
+            : 'Profile request failed (HTTP ${response.statusCode})');
+      }
+      return decoded;
+    } on AuthException { rethrow; }
+      on TimeoutException { throw const AuthException('Profile request timed out'); }
+      on FormatException { throw const AuthException('Invalid profile response'); }
+      catch (_) { throw const AuthException('Unable to load member profile'); }
+  }
+
+  Future<Map<String, dynamic>> updateMemberProfile(Map<String, dynamic> fields) async {
+    Future<http.Response> send() => _http.post(
+      Uri.parse('https://dev.nostalgiadragleague.com/api/mobile_profile_api.php?action=update_profile'),
+      headers: {'Accept': 'application/json', 'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_access'},
+      body: jsonEncode(fields),
+    ).timeout(const Duration(seconds: 20));
+    try {
+      if (_access == null) await refresh();
+      var response = await send();
+      if (response.statusCode == 401) {
+        await refresh();
+        response = await send();
+      }
+      final data = jsonDecode(response.body);
+      if (data is! Map<String, dynamic>) throw const AuthException('Unexpected server response');
+      if (response.statusCode < 200 || response.statusCode >= 300 || data['success'] != true) {
+        throw AuthException(data['error'] is String ? data['error'] as String
+          : 'Save failed (HTTP ${response.statusCode})');
+      }
+      return data;
+    } on AuthException { rethrow; }
+      on TimeoutException { throw const AuthException('Save timed out; refresh profile before retrying'); }
+      on FormatException { throw const AuthException('Invalid server response'); }
+      catch (_) { throw const AuthException('Unable to save profile; check connection'); }
+  }
+
+
+  static const _profileApi = 'https://dev.nostalgiadragleague.com/api/mobile_profile_api.php';
+
+  Future<Map<String, dynamic>> profileAction(String action, Map<String, dynamic> body) async {
+    Future<http.Response> send() => _http.post(
+      Uri.parse('$_profileApi?action=$action'),
+      headers: {'Accept': 'application/json', 'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_access'},
+      body: jsonEncode(body),
+    ).timeout(const Duration(seconds: 25));
+    try {
+      if (_access == null) await refresh();
+      var response = await send();
+      if (response.statusCode == 401) { await refresh(); response = await send(); }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) throw const AuthException('Invalid server response');
+      if (response.statusCode < 200 || response.statusCode >= 300 || decoded['success'] != true) {
+        throw AuthException(decoded['error']?.toString() ?? 'Request failed (HTTP ${response.statusCode})');
+      }
+      return decoded;
+    } on AuthException { rethrow; }
+      on TimeoutException { throw const AuthException('Request timed out; refresh before retrying'); }
+      on FormatException { throw const AuthException('Invalid server response'); }
+      catch (_) { throw const AuthException('Unable to connect to NDRL DEV'); }
+  }
+
+  Future<Map<String, dynamic>> uploadProfileImage(String action, String path,
+      {int? carId}) async {
+    Future<http.Response> send() async {
+      final request = http.MultipartRequest('POST', Uri.parse('$_profileApi?action=$action'));
+      request.headers['Accept'] = 'application/json';
+      request.headers['Authorization'] = 'Bearer $_access';
+      if (carId != null) request.fields['member_season_class_id'] = '$carId';
+      request.files.add(await http.MultipartFile.fromPath('file', path));
+      final streamed = await _http.send(request).timeout(const Duration(seconds: 60));
+      return http.Response.fromStream(streamed);
+    }
+    try {
+      if (_access == null) await refresh();
+      var response = await send();
+      if (response.statusCode == 401) { await refresh(); response = await send(); }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) throw const AuthException('Invalid upload response');
+      if (response.statusCode < 200 || response.statusCode >= 300 || decoded['success'] != true) {
+        throw AuthException(decoded['error']?.toString() ?? 'Upload failed (HTTP ${response.statusCode})');
+      }
+      return decoded;
+    } on AuthException { rethrow; }
+      on TimeoutException { throw const AuthException('Upload timed out; refresh before retrying'); }
+      on FormatException { throw const AuthException('Invalid upload response'); }
+      catch (_) { throw const AuthException('Unable to upload image'); }
+  }
+
   Future<void> login(String email, String pin) async {
     loading = true; _notify();
     try {
