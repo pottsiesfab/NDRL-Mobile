@@ -5,12 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import 'notification_settings_screen.dart';
+
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
-const _seasonId = 3; // DEV notification season only.
+const _api = 'https://dev.nostalgiadragleague.com/api/notify_history_api.php';
 const _credentialKey = 'ndrl_dev_device_credential';
-const _base = 'https://dev.nostalgiadragleague.com/api';
 
 class NdrlAlertsScreen extends StatefulWidget {
   const NdrlAlertsScreen({super.key});
@@ -22,185 +23,156 @@ class NdrlAlertsScreen extends StatefulWidget {
 class _NdrlAlertsScreenState extends State<NdrlAlertsScreen> {
   final _storage = const FlutterSecureStorage();
   final _client = http.Client();
-  bool _loading = true;
+  final _items = <_HistoryItem>[];
+  bool _loading = false;
+  bool _loadingMore = false;
+  bool _hasMore = false;
+  int? _nextCursor;
   String? _error;
-  String? _seasonName;
-  bool? _notificationsEnabled;
-  List<_ClassSubscription> _classes = [];
-  List<_EventSubscription> _events = [];
-  Map<String, bool> _preferences = {};
-  final Set<String> _saving = {};
+  int _requestGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
+    unawaited(_refresh());
   }
 
   @override
   void dispose() {
+    _requestGeneration++;
     _client.close();
     super.dispose();
   }
 
-  Future<Map<String, dynamic>> _request(
-    String action, {
-    Map<String, dynamic>? data,
-  }) async {
-    // DeviceService creates and stores this credential. Never create a second
-    // device identity or display the credential in the UI.
+  Future<Map<String, dynamic>> _fetch({int? beforeId}) async {
     final credential = await _storage.read(key: _credentialKey);
     if (credential == null || credential.isEmpty) {
-      throw StateError('Device registration is not ready. Try again shortly.');
+      throw StateError('Device registration is not ready. Please try again.');
     }
-    final uri = Uri.parse('$_base/notify_subscriptions_api.php').replace(
+    final uri = Uri.parse(_api).replace(
       queryParameters: {
-        'action': action,
-        if (action == 'status') 'season_id': '$_seasonId',
+        'limit': '20',
+        if (beforeId != null) 'before_id': '$beforeId',
       },
     );
-    final headers = <String, String>{
-      'Authorization': 'Bearer $credential',
-      if (data != null) 'Content-Type': 'application/json',
-    };
-    final response =
-        await (data == null
-                ? _client.get(uri, headers: headers)
-                : _client.post(uri, headers: headers, body: jsonEncode(data)))
-            .timeout(const Duration(seconds: 20));
+    final response = await _client
+        .get(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $credential',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(const Duration(seconds: 20));
     final decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Unexpected server response');
     }
-    if (response.statusCode < 200 ||
-        response.statusCode >= 300 ||
-        decoded['success'] != true) {
-      // Do not expose response bodies, tokens, or credentials.
+    if (response.statusCode != 200 || decoded['success'] != true) {
       final reason = decoded['error'];
-      throw StateError(reason is String ? reason : 'Request failed');
+      throw StateError(reason is String ? reason : 'Unable to load alerts');
     }
     return decoded;
   }
 
-  Future<void> _load() async {
-    if (_saving.isNotEmpty) return;
-    if (mounted) {
+  Future<void> _refresh() async {
+    final generation = ++_requestGeneration;
+    if (mounted)
       setState(() {
         _loading = true;
         _error = null;
       });
-    }
     try {
-      final result = await _request('status');
-      final rawClasses = result['classes'];
-      final rawEvents = result['events'];
-      final rawPrefs = result['preferences'];
-      if (rawClasses is! List || rawEvents is! List || rawPrefs is! Map) {
-        throw const FormatException('Incomplete subscription response');
-      }
-      final classes = rawClasses.map((item) {
-        if (item is! Map<String, dynamic>) {
-          throw const FormatException('Invalid class');
-        }
-        return _ClassSubscription.fromJson(item);
-      }).toList();
-      final events = rawEvents.map((item) {
-        if (item is! Map<String, dynamic>) {
-          throw const FormatException('Invalid event');
-        }
-        return _EventSubscription.fromJson(item);
-      }).toList();
-      final season = result['season'];
-      if (!mounted) return;
+      final result = await _fetch();
+      final parsed = _parsePage(result);
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
-        _classes = classes;
-        _events = events;
-        _preferences = {
-          'news': rawPrefs['news'] == true,
-          'event_general': rawPrefs['event_general'] == true,
-        };
-        _notificationsEnabled = result['notifications_enabled'] == true;
-        _seasonName = season is Map ? season['name']?.toString() : null;
+        _items
+          ..clear()
+          ..addAll(parsed.items);
+        _hasMore = parsed.hasMore;
+        _nextCursor = parsed.nextCursor;
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = _friendlyError(e));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  String _friendlyError(Object e) {
-    if (e is StateError) return e.message.toString();
-    return 'Unable to contact NDRL DEV. Check your connection and try again.';
-  }
-
-  Future<void> _changeClass(_ClassSubscription item, bool enabled) async {
-    final key = 'class:${item.id}';
-    if (_saving.contains(key)) return;
-    setState(() => _saving.add(key));
-    try {
-      await _request(
-        'class.set',
-        data: {
-          'class_id': item.id,
-          'enabled': enabled,
-          if (enabled) 'season_id': _seasonId,
-        },
+    } catch (_) {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(
+        () => _error = 'Could not load notification history. Please retry.',
       );
-      if (!mounted) return;
-      setState(() => item.subscribed = enabled);
-    } catch (e) {
-      _showError(_friendlyError(e));
     } finally {
-      if (mounted) setState(() => _saving.remove(key));
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _loading = false);
+      }
     }
   }
 
-  Future<void> _changePreference(String type, bool enabled) async {
-    final key = 'pref:$type';
-    if (_saving.contains(key)) return;
-    setState(() => _saving.add(key));
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore || _nextCursor == null) return;
+    final generation = _requestGeneration;
+    final cursor = _nextCursor;
+    setState(() {
+      _loadingMore = true;
+      _error = null;
+    });
     try {
-      await _request(
-        'preference.set',
-        data: {'type': type, 'enabled': enabled},
-      );
-      if (!mounted) return;
-      setState(() => _preferences[type] = enabled);
-    } catch (e) {
-      _showError(_friendlyError(e));
+      final parsed = _parsePage(await _fetch(beforeId: cursor));
+      if (!mounted || generation != _requestGeneration) return;
+      final seen = _items.map((e) => e.id).toSet();
+      setState(() {
+        _items.addAll(parsed.items.where((e) => seen.add(e.id)));
+        _hasMore = parsed.hasMore;
+        _nextCursor = parsed.nextCursor;
+      });
+    } catch (_) {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() => _error = 'Could not load older alerts. Please retry.');
     } finally {
-      if (mounted) setState(() => _saving.remove(key));
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _loadingMore = false);
+      }
     }
   }
 
-  Future<void> _changeEvent(_EventSubscription item, bool muted) async {
-    final key = 'event:${item.id}';
-    if (_saving.contains(key)) return;
-    setState(() => _saving.add(key));
-    try {
-      await _request('event.mute', data: {'event_id': item.id, 'muted': muted});
-      if (!mounted) return;
-      setState(() => item.muted = muted);
-    } catch (e) {
-      _showError(_friendlyError(e));
-    } finally {
-      if (mounted) setState(() => _saving.remove(key));
+  _HistoryPage _parsePage(Map<String, dynamic> result) {
+    final raw = result['notifications'];
+    final pagination = result['pagination'];
+    if (raw is! List || pagination is! Map) {
+      throw const FormatException('Incomplete notification history');
     }
+    final items = raw.map((item) {
+      if (item is! Map<String, dynamic>) {
+        throw const FormatException('Invalid notification');
+      }
+      return _HistoryItem.fromJson(item);
+    }).toList();
+    final more = pagination['has_more'] == true;
+    final cursor = pagination['next_cursor'];
+    if (more && (cursor is! int || cursor < 1)) {
+      throw const FormatException('Invalid pagination cursor');
+    }
+    return _HistoryPage(items, more, cursor is int ? cursor : null);
   }
 
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+  Future<void> _openSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: const Color(0xFF111111),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF111111),
+            title: const Text('Notification Settings'),
+          ),
+          body: const NdrlNotificationSettingsScreen(),
+        ),
+      ),
+    );
+    if (mounted) unawaited(_refresh());
   }
 
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
       color: _red,
-      onRefresh: _load,
+      onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
@@ -209,7 +181,7 @@ class _NdrlAlertsScreenState extends State<NdrlAlertsScreen> {
             children: [
               const Expanded(
                 child: Text(
-                  'NDRL ALERTS',
+                  'RECENT ALERTS',
                   style: TextStyle(
                     color: _gold,
                     fontSize: 23,
@@ -219,9 +191,14 @@ class _NdrlAlertsScreenState extends State<NdrlAlertsScreen> {
                 ),
               ),
               IconButton(
-                onPressed: _loading || _saving.isNotEmpty ? null : _load,
-                tooltip: 'Refresh preferences',
+                tooltip: 'Notification settings',
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: _openSettings,
+              ),
+              IconButton(
+                tooltip: 'Refresh alerts',
                 icon: const Icon(Icons.refresh),
+                onPressed: _loading ? null : _refresh,
               ),
             ],
           ),
@@ -229,230 +206,184 @@ class _NdrlAlertsScreenState extends State<NdrlAlertsScreen> {
             'DEV TEST · NOT LIVE RACE NOTIFICATIONS',
             style: TextStyle(color: _gold, fontSize: 11),
           ),
-          const SizedBox(height: 16),
-          Card(
-            color: _surface,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.notifications_active_outlined, color: _gold),
-                      SizedBox(width: 10),
-                      Text(
-                        'Notification Preferences',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Choose the racing classes and updates you want to receive.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                  if (_seasonName != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Season: $_seasonName',
-                      style: const TextStyle(color: _gold),
-                    ),
-                  ],
-                  if (_notificationsEnabled == false) ...[
-                    const SizedBox(height: 12),
-                    const Text(
-                      'This device has notifications disabled on the server. '
-                      'Your choices can be saved, but delivery may remain disabled.',
-                      style: TextStyle(color: Colors.orangeAccent),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          if (_loading) ...[
-            const SizedBox(height: 12),
-            const LinearProgressIndicator(color: _red),
-          ],
+          const SizedBox(height: 12),
+          if (_loading) const LinearProgressIndicator(color: _red),
           if (_error != null) ...[
             const SizedBox(height: 12),
             Text(_error!, style: const TextStyle(color: Colors.orangeAccent)),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: _loading ? null : _load,
+              onPressed: _loading ? null : _refresh,
               icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
+              label: const Text('Retry'),
             ),
           ],
-          if (_classes.isNotEmpty || _preferences.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            const _SectionTitle('CLASS STAGING ALERTS'),
-            const SizedBox(height: 8),
-            for (final item in _classes)
-              Card(
-                color: _surface,
-                margin: const EdgeInsets.only(bottom: 8),
-                child: SwitchListTile(
-                  activeThumbColor: _gold,
-                  title: Text(item.name),
-                  subtitle: !item.available
-                      ? const Text(
-                          'Unavailable this season',
-                          style: TextStyle(color: Colors.white54),
-                        )
-                      : null,
-                  value: item.subscribed,
-                  onChanged:
-                      (_saving.contains('class:${item.id}') ||
-                          (!item.available && !item.subscribed))
-                      ? null
-                      : (value) => _changeClass(item, value),
-                ),
-              ),
-            const SizedBox(height: 20),
-            const _SectionTitle('GENERAL NOTIFICATIONS'),
-            const SizedBox(height: 8),
-            _preferenceTile(
-              'event_general',
-              'Event Announcements',
-              'General race event updates',
-            ),
-            _preferenceTile(
-              'news',
-              'NDRL News',
-              'League news and announcements',
-            ),
-          ],
-          if (_events.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            const _SectionTitle('MUTE INDIVIDUAL EVENTS'),
-            const SizedBox(height: 6),
-            const Text(
-              'Muting an event suppresses its notifications for this device.',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            for (final item in _events)
-              Card(
-                color: _surface,
-                margin: const EdgeInsets.only(bottom: 8),
-                child: SwitchListTile(
-                  activeThumbColor: _gold,
-                  title: Text(item.name),
-                  subtitle: Text(
-                    item.muted ? 'Muted' : 'Notifications allowed',
-                    style: const TextStyle(color: Colors.white70),
+          if (!_loading && _items.isEmpty && _error == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 64, horizontal: 16),
+              child: Column(
+                children: [
+                  Icon(Icons.notifications_none, size: 58, color: _gold),
+                  SizedBox(height: 16),
+                  Text(
+                    'No alerts yet',
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
                   ),
-                  value: item.muted,
-                  onChanged: _saving.contains('event:${item.id}')
-                      ? null
-                      : (value) => _changeEvent(item, value),
-                ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Notifications accepted for this device will appear here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
               ),
+            ),
+          for (final item in _items) _AlertCard(item: item),
+          if (_hasMore && !_loading) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _loadingMore ? null : _loadMore,
+              icon: _loadingMore
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.expand_more),
+              label: Text(_loadingMore ? 'Loading...' : 'Load older alerts'),
+            ),
           ],
-          const SizedBox(height: 24),
-          const _SectionTitle('FEATURED NDRL PARTNER'),
-          const SizedBox(height: 8),
-          Container(
-            height: 110,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: const Text(
-              'Sponsor placement',
-              style: TextStyle(color: Colors.white70),
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
+}
 
-  Widget _preferenceTile(String type, String title, String subtitle) {
+class _HistoryPage {
+  const _HistoryPage(this.items, this.hasMore, this.nextCursor);
+  final List<_HistoryItem> items;
+  final bool hasMore;
+  final int? nextCursor;
+}
+
+class _HistoryItem {
+  const _HistoryItem({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.body,
+    required this.createdAt,
+    this.className,
+    this.eventName,
+    this.roundLabel,
+  });
+
+  final int id;
+  final String type;
+  final String title;
+  final String body;
+  final DateTime createdAt;
+  final String? className;
+  final String? eventName;
+  final String? roundLabel;
+
+  factory _HistoryItem.fromJson(Map<String, dynamic> json) {
+    final id = json['message_id'];
+    final title = json['title'];
+    final body = json['body'];
+    final time = json['created_at'];
+    if (id is! int || title is! String || body is! String || time is! String) {
+      throw const FormatException('Invalid notification fields');
+    }
+    return _HistoryItem(
+      id: id,
+      type: json['message_type']?.toString() ?? 'notification',
+      title: title,
+      body: body,
+      createdAt: DateTime.parse(time).toLocal(),
+      className: json['class_name']?.toString(),
+      eventName: json['event_name']?.toString(),
+      roundLabel: json['round_label']?.toString(),
+    );
+  }
+}
+
+class _AlertCard extends StatelessWidget {
+  const _AlertCard({required this.item});
+  final _HistoryItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = item.createdAt;
+    final dateText =
+        '${date.month}/${date.day}/${date.year}  '
+        '${_clock(date)}';
+    final details = [
+      item.className,
+      item.roundLabel,
+      item.eventName,
+    ].whereType<String>().where((s) => s.trim().isNotEmpty).toList();
     return Card(
       color: _surface,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: SwitchListTile(
-        activeThumbColor: _gold,
-        title: Text(title),
-        subtitle: Text(subtitle),
-        value: _preferences[type] ?? false,
-        onChanged: _saving.contains('pref:$type')
-            ? null
-            : (value) => _changePreference(type, value),
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  item.type == 'staging'
+                      ? Icons.flag_outlined
+                      : Icons.notifications_outlined,
+                  size: 17,
+                  color: _gold,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item.type.replaceAll('_', ' ').toUpperCase(),
+                    style: const TextStyle(
+                      color: _gold,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                Text(
+                  dateText,
+                  style: const TextStyle(color: Colors.white60, fontSize: 11),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            Text(
+              item.title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            if (item.body.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(item.body, style: const TextStyle(color: Colors.white70)),
+            ],
+            if (details.isNotEmpty) ...[
+              const SizedBox(height: 9),
+              Text(
+                details.join(' · '),
+                style: const TextStyle(color: _gold, fontSize: 12),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
-}
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: const TextStyle(
-      color: _gold,
-      fontSize: 12,
-      fontWeight: FontWeight.bold,
-      letterSpacing: 1.2,
-    ),
-  );
-}
-
-class _ClassSubscription {
-  _ClassSubscription({
-    required this.id,
-    required this.name,
-    required this.available,
-    required this.subscribed,
-  });
-  final int id;
-  final String name;
-  final bool available;
-  bool subscribed;
-  factory _ClassSubscription.fromJson(Map<String, dynamic> json) {
-    final id = json['class_id'];
-    final name = json['name'];
-    if (id is! num || name is! String) {
-      throw const FormatException('Invalid class subscription data');
-    }
-    return _ClassSubscription(
-      id: id.toInt(),
-      name: name,
-      available: json['available'] == true,
-      subscribed: json['subscribed'] == true,
-    );
-  }
-}
-
-class _EventSubscription {
-  _EventSubscription({
-    required this.id,
-    required this.name,
-    required this.muted,
-  });
-  final int id;
-  final String name;
-  bool muted;
-  factory _EventSubscription.fromJson(Map<String, dynamic> json) {
-    final id = json['event_id'];
-    final name = json['name'];
-    if (id is! num || name is! String) {
-      throw const FormatException('Invalid event subscription data');
-    }
-    return _EventSubscription(
-      id: id.toInt(),
-      name: name,
-      muted: json['muted'] == true,
-    );
+  String _clock(DateTime date) {
+    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${date.hour < 12 ? 'AM' : 'PM'}';
   }
 }

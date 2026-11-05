@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'staging_screen.dart';
 import 'alerts_screen.dart';
+import 'notification_settings_screen.dart';
 
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
@@ -52,6 +53,21 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
     );
   }
 
+  void _openNotificationSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: ndrlBackground,
+          appBar: AppBar(
+            backgroundColor: ndrlBackground,
+            title: const Text('Notification Settings'),
+          ),
+          body: const NdrlNotificationSettingsScreen(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -59,7 +75,10 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       NdrlStagingScreen(isActive: _selectedIndex == 1),
       const NdrlFeatureScreen(title: 'Events'),
       const NdrlAlertsScreen(),
-      _MoreScreen(onOpenFeature: _openFeature),
+      _MoreScreen(
+        onOpenFeature: _openFeature,
+        onOpenNotificationSettings: _openNotificationSettings,
+      ),
     ];
 
     return Scaffold(
@@ -310,9 +329,13 @@ class NdrlFeatureScreen extends StatelessWidget {
 }
 
 class _MoreScreen extends StatelessWidget {
-  const _MoreScreen({required this.onOpenFeature});
+  const _MoreScreen({
+    required this.onOpenFeature,
+    required this.onOpenNotificationSettings,
+  });
 
   final void Function(String) onOpenFeature;
+  final VoidCallback onOpenNotificationSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +367,13 @@ class _MoreScreen extends StatelessWidget {
               leading: Icon(entry.$2, color: ndrlGold),
               title: Text(entry.$1),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => onOpenFeature(entry.$1),
+              onTap: () {
+                if (entry.$1 == 'Notification Settings') {
+                  onOpenNotificationSettings();
+                } else {
+                  onOpenFeature(entry.$1);
+                }
+              },
             ),
           ),
         const SizedBox(height: 24),
