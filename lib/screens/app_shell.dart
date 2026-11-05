@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'staging_screen.dart';
+import 'alerts_screen.dart';
 
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
@@ -57,7 +58,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       _HomeScreen(onOpenFeature: _openFeature, onOpenStaging: _openStaging),
       NdrlStagingScreen(isActive: _selectedIndex == 1),
       const NdrlFeatureScreen(title: 'Events'),
-      const NdrlFeatureScreen(title: 'Notifications'),
+      const NdrlAlertsScreen(),
       _MoreScreen(onOpenFeature: _openFeature),
     ];
 
