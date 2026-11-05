@@ -49,13 +49,38 @@ class _NdrlProfileScreenState extends State<NdrlProfileScreen> {
   Future<void> _pickPhoto({int? carId}) async {
     if (_changingPhoto) return;
     try {
-      final picked = await ImagePicker().pickImage(source: ImageSource.gallery,
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ]),
+        ),
+      );
+      if (source == null || !mounted) return;
+      final picked = await ImagePicker().pickImage(source: source,
         maxWidth: 1600, maxHeight: 1600, imageQuality: 85);
       if (picked == null || !mounted) return;
       final confirmed = await showDialog<bool>(context: context,
         builder: (ctx) => AlertDialog(
           title: Text(carId == null ? 'Change profile photo?' : 'Change car photo?'),
-          content: const Text('Upload this photo to your NDRL member profile?'),
+          content: Text(carId == null
+             ? 'Upload this photo to your NDRL member profile?'
+             : 'Upload this photo for your race car?'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Upload')),
