@@ -4,6 +4,12 @@ import 'staging_screen.dart';
 import 'alerts_screen.dart';
 import 'notification_settings_screen.dart';
 import 'events_screen.dart';
+import 'sponsors_screen.dart';
+import 'season_points_screen.dart';
+import 'members_screen.dart';
+import '../widgets/sponsor_ad_widget.dart';
+import '../services/auth_service.dart';
+import 'account_screen.dart';
 
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
@@ -11,7 +17,9 @@ const ndrlRed = Color(0xFFB91C1C);
 const ndrlGold = Color(0xFFD1AC67);
 
 class NdrlAppShell extends StatefulWidget {
-  const NdrlAppShell({super.key});
+  const NdrlAppShell({super.key, required this.authService});
+
+  final AuthService authService;
 
   @override
   State<NdrlAppShell> createState() => _NdrlAppShellState();
@@ -50,7 +58,23 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
 
   void _openFeature(String title) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => NdrlFeatureScreen(title: title)),
+      MaterialPageRoute<void>(
+        builder: (_) => title == 'NDRL Members' || title == 'Driver Profiles'
+            ? const NdrlMembersScreen()
+            : title == 'Our Sponsors'
+            ? const NdrlSponsorsScreen()
+            : title == 'Season Points'
+            ? const NdrlSeasonPointsScreen()
+            : NdrlFeatureScreen(title: title),
+      ),
+    );
+  }
+
+  void _openAccount() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NdrlAccountScreen(authService: widget.authService),
+      ),
     );
   }
 
@@ -72,13 +96,18 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      _HomeScreen(onOpenFeature: _openFeature, onOpenStaging: _openStaging),
+      _HomeScreen(
+        onOpenFeature: _openFeature,
+        onOpenStaging: _openStaging,
+        isActive: _selectedIndex == 0,
+      ),
       NdrlStagingScreen(isActive: _selectedIndex == 1),
       const NdrlEventsScreen(),
       const NdrlAlertsScreen(),
       _MoreScreen(
         onOpenFeature: _openFeature,
         onOpenNotificationSettings: _openNotificationSettings,
+        onOpenAccount: _openAccount,
       ),
     ];
 
@@ -115,10 +144,15 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
 }
 
 class _HomeScreen extends StatelessWidget {
-  const _HomeScreen({required this.onOpenFeature, required this.onOpenStaging});
+  const _HomeScreen({
+    required this.onOpenFeature,
+    required this.onOpenStaging,
+    required this.isActive,
+  });
 
   final void Function(String) onOpenFeature;
   final VoidCallback onOpenStaging;
+  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +230,7 @@ class _HomeScreen extends StatelessWidget {
               onTap: () => onOpenFeature('Fantasy Racing'),
             ),
             _FeatureTile(
-              title: 'Driver Profiles',
+              title: 'NDRL Members',
               icon: Icons.people_outline,
               onTap: () => onOpenFeature('Driver Profiles'),
             ),
@@ -208,7 +242,17 @@ class _HomeScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
-        const SponsorPlacement(),
+        NdrlSponsorAdWidget(
+          placement: 'home_featured',
+          isActive: isActive,
+          heading: 'FEATURED NDRL PARTNER',
+        ),
+        const SizedBox(height: 16),
+        NdrlSponsorAdWidget(
+          placement: 'home_rotation',
+          isActive: isActive,
+          heading: 'NDRL SPONSORS',
+        ),
       ],
     );
   }
@@ -333,18 +377,21 @@ class _MoreScreen extends StatelessWidget {
   const _MoreScreen({
     required this.onOpenFeature,
     required this.onOpenNotificationSettings,
+    required this.onOpenAccount,
   });
 
   final void Function(String) onOpenFeature;
   final VoidCallback onOpenNotificationSettings;
+  final VoidCallback onOpenAccount;
 
   @override
   Widget build(BuildContext context) {
     const entries = [
+      ('My Account', Icons.account_circle_outlined),
       ('Our Sponsors', Icons.handshake_outlined),
       ('Season Points', Icons.emoji_events_outlined),
       ('Fantasy Racing', Icons.sports_score),
-      ('Driver Profiles', Icons.people_outline),
+      ('NDRL Members', Icons.people_outline),
       ('Notification Settings', Icons.settings_outlined),
       ('About NDRL', Icons.info_outline),
     ];
@@ -369,7 +416,9 @@ class _MoreScreen extends StatelessWidget {
               title: Text(entry.$1),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
-                if (entry.$1 == 'Notification Settings') {
+                if (entry.$1 == 'My Account') {
+                  onOpenAccount();
+                } else if (entry.$1 == 'Notification Settings') {
                   onOpenNotificationSettings();
                 } else {
                   onOpenFeature(entry.$1);

@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'screens/app_shell.dart';
 import 'screens/splash_screen.dart';
 import 'services/device_service.dart';
+import 'services/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,12 +26,15 @@ class NdrlApp extends StatefulWidget {
 
 class _NdrlAppState extends State<NdrlApp> {
   late final DeviceService _deviceService;
+  late final AuthService _authService;
   bool _splashFinished = false;
 
   @override
   void initState() {
     super.initState();
     _deviceService = DeviceService();
+    _authService = AuthService(deviceService: _deviceService);
+    unawaited(_authService.restore());
     // Device registration runs independently of the splash and dashboard.
     // The service captures setup failures in its status fields.
     unawaited(_deviceService.start());
@@ -38,6 +42,7 @@ class _NdrlAppState extends State<NdrlApp> {
 
   @override
   void dispose() {
+    _authService.dispose();
     _deviceService.dispose();
     super.dispose();
   }
@@ -62,7 +67,7 @@ class _NdrlAppState extends State<NdrlApp> {
         useMaterial3: true,
       ),
       home: _splashFinished
-          ? const NdrlAppShell()
+          ? NdrlAppShell(authService: _authService)
           : NdrlSplashScreen(onFinished: _finishSplash),
     );
   }

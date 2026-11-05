@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../widgets/sponsor_ad_widget.dart';
+
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
@@ -197,28 +199,10 @@ class _NdrlStagingScreenState extends State<NdrlStagingScreen>
           if (!_loading && _classes.isEmpty && _error == null)
             const Text('No classes were returned for this event.'),
           const SizedBox(height: 18),
-          const Text(
-            'FEATURED NDRL PARTNER',
-            style: TextStyle(
-              color: _gold,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            height: 110,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: const Text(
-              'Sponsor placement',
-              style: TextStyle(color: Colors.white70),
-            ),
+          NdrlSponsorAdWidget(
+            placement: 'staging_banner',
+            isActive: widget.isActive,
+            heading: 'FEATURED NDRL PARTNER',
           ),
         ],
       ),
