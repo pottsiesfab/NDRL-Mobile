@@ -55,7 +55,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   Widget build(BuildContext context) {
     final pages = [
       _HomeScreen(onOpenFeature: _openFeature, onOpenStaging: _openStaging),
-      const NdrlStagingScreen(),
+      NdrlStagingScreen(isActive: _selectedIndex == 1),
       const NdrlFeatureScreen(title: 'Events'),
       const NdrlFeatureScreen(title: 'Notifications'),
       _MoreScreen(onOpenFeature: _openFeature),

@@ -11,13 +11,50 @@ const _apiUrl =
     'https://dev.nostalgiadragleague.com/api/notify_staging_board_api.php?event_id=14';
 
 class NdrlStagingScreen extends StatefulWidget {
-  const NdrlStagingScreen({super.key});
+  const NdrlStagingScreen({super.key, this.isActive = false});
+
+  /// The IndexedStack keeps this screen mounted while other tabs are shown.
+  final bool isActive;
 
   @override
   State<NdrlStagingScreen> createState() => _NdrlStagingScreenState();
 }
 
-class _NdrlStagingScreenState extends State<NdrlStagingScreen> {
+class _NdrlStagingScreenState extends State<NdrlStagingScreen>
+    with WidgetsBindingObserver {
+  static const _refreshInterval = Duration(seconds: 15);
+  Timer? _refreshTimer;
+  bool _appInForeground = true;
+  bool _requestInProgress = false;
+
+  bool get _shouldRefresh => widget.isActive && _appInForeground;
+
+  void _updateRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+    if (_shouldRefresh) {
+      _refreshTimer = Timer.periodic(_refreshInterval, (_) => _refresh());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant NdrlStagingScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      _updateRefreshTimer();
+      if (_shouldRefresh) _refresh();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final foreground = state == AppLifecycleState.resumed;
+    if (_appInForeground == foreground) return;
+    _appInForeground = foreground;
+    _updateRefreshTimer();
+    if (_shouldRefresh) _refresh();
+  }
+
   bool _loading = true;
   String? _error;
   String? _eventName;
@@ -28,11 +65,14 @@ class _NdrlStagingScreenState extends State<NdrlStagingScreen> {
   @override
   void initState() {
     super.initState();
-    _refresh();
+    WidgetsBinding.instance.addObserver(this);
+    _updateRefreshTimer();
+    if (_shouldRefresh) _refresh();
   }
 
   Future<void> _refresh() async {
-    if (_loading && _eventName != null) return;
+    if (_requestInProgress) return;
+    _requestInProgress = true;
     setState(() {
       _loading = true;
       _error = null;
@@ -70,6 +110,7 @@ class _NdrlStagingScreenState extends State<NdrlStagingScreen> {
         _error = 'Unable to refresh staging information. Check your connection and try again.';
       });
     } finally {
+      _requestInProgress = false;
       if (mounted && !_disposed) setState(() => _loading = false);
     }
   }
@@ -77,6 +118,8 @@ class _NdrlStagingScreenState extends State<NdrlStagingScreen> {
   @override
   void dispose() {
     _disposed = true;
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -112,6 +155,13 @@ class _NdrlStagingScreenState extends State<NdrlStagingScreen> {
           const Text(
             'DEV TEST EVENT · NOT LIVE RACE INFORMATION',
             style: TextStyle(color: _gold, fontSize: 11),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            widget.isActive
+                ? 'Auto-refresh every 15 seconds'
+                : 'Auto-refresh paused',
+            style: const TextStyle(color: Colors.white54, fontSize: 11),
           ),
           const SizedBox(height: 12),
           Text(
