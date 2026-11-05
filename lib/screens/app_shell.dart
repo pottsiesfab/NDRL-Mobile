@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'staging_screen.dart';
+
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
 const ndrlRed = Color(0xFFB91C1C);
@@ -39,6 +41,10 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
     NavigationDestination(icon: Icon(Icons.menu), label: 'More'),
   ];
 
+  void _openStaging() {
+    setState(() => _selectedIndex = 1);
+  }
+
   void _openFeature(String title) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => NdrlFeatureScreen(title: title)),
@@ -48,8 +54,8 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      _HomeScreen(onOpenFeature: _openFeature),
-      const NdrlFeatureScreen(title: 'Live Staging'),
+      _HomeScreen(onOpenFeature: _openFeature, onOpenStaging: _openStaging),
+      const NdrlStagingScreen(),
       const NdrlFeatureScreen(title: 'Events'),
       const NdrlFeatureScreen(title: 'Notifications'),
       _MoreScreen(onOpenFeature: _openFeature),
@@ -88,9 +94,10 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
 }
 
 class _HomeScreen extends StatelessWidget {
-  const _HomeScreen({required this.onOpenFeature});
+  const _HomeScreen({required this.onOpenFeature, required this.onOpenStaging});
 
   final void Function(String) onOpenFeature;
+  final VoidCallback onOpenStaging;
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +120,7 @@ class _HomeScreen extends StatelessWidget {
           color: ndrlRed,
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => onOpenFeature('Live Staging'),
+            onTap: onOpenStaging,
             child: const Padding(
               padding: EdgeInsets.all(22),
               child: Column(

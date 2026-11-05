@@ -21,14 +21,28 @@ void main() {
       const MaterialApp(themeMode: ThemeMode.dark, home: NdrlAppShell()),
     );
 
+    // Navigate to Staging.
     await tester.tap(find.byIcon(Icons.flag_outlined));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
-    expect(find.text('Live Staging'), findsOneWidget);
+    // Verify the Staging tab is selected.
+    final stagingNavigation = tester.widget<NavigationBar>(
+      find.byType(NavigationBar),
+    );
 
+    expect(stagingNavigation.selectedIndex, 1);
+
+    // Navigate to Events.
     await tester.tap(find.byIcon(Icons.event_outlined));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
+    final eventsNavigation = tester.widget<NavigationBar>(
+      find.byType(NavigationBar),
+    );
+
+    expect(eventsNavigation.selectedIndex, 2);
+
+    // Verify the Events screen is displayed.
     expect(find.text('Events'), findsWidgets);
   });
 }
