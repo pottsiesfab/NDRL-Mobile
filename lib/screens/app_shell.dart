@@ -61,7 +61,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => title == 'Fantasy Racing'
-            ? const NdrlFantasyHubScreen()
+            ? NdrlFantasyHubScreen(authService: widget.authService)
             : title == 'NDRL Members' || title == 'Driver Profiles'
             ? const NdrlMembersScreen()
             : title == 'Our Sponsors'
