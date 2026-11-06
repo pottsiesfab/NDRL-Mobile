@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/sponsor_ad_widget.dart';
+
 import '../../services/fantasy_service.dart';
 import '../../services/auth_service.dart';
 import 'fantasy_my_team_screen.dart';
+import 'fantasy_driver_research_screen.dart';
 
 const _background = Color(0xFF080A12);
 const _panel = Color(0xFF101525);
@@ -61,6 +64,23 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
   }
 
   void _openDestination(String title) {
+    if (title == 'Driver Pricing' || title == 'Driver Stats') {
+      final season = _seasons
+          .where((s) => s.id == _selectedSeasonId)
+          .firstOrNull;
+      if (season == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Select a Fantasy season first.')),
+        );
+        return;
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => NdrlFantasyDriverResearchScreen(season: season),
+        ),
+      );
+      return;
+    }
     if (title == 'My Team') {
       final season = _seasons
           .where((s) => s.id == _selectedSeasonId)
@@ -259,6 +279,11 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
                     ),
                 ],
               ),
+            ),
+            const SizedBox(height: 20),
+            const NdrlSponsorAdWidget(
+              placement: 'fantasy_banner',
+              heading: 'FANTASY LEAGUE SPONSORS',
             ),
             const SizedBox(height: 24),
             const Text(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/sponsor_ad_widget.dart';
+
 import '../../services/auth_service.dart';
 import '../../services/fantasy_service.dart';
 
@@ -143,6 +145,11 @@ class _NdrlFantasyMyTeamScreenState extends State<NdrlFantasyMyTeamScreen> {
               style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
+            const NdrlSponsorAdWidget(
+              placement: 'fantasy_banner',
+              heading: 'FANTASY LEAGUE SPONSORS',
+            ),
+            const SizedBox(height: 20),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.only(top: 50),

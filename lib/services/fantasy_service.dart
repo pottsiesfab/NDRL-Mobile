@@ -47,6 +47,61 @@ class NdrlFantasyService {
     return authService.authorizedGet(uri);
   }
 
+  static const String driversEndpoint =
+      'https://dev.nostalgiadragleague.com/fantasy/api/drivers_api.php';
+
+  Future<Map<String, dynamic>> _driversRequest(
+    Map<String, String> params,
+  ) async {
+    final uri = Uri.parse(driversEndpoint).replace(queryParameters: params);
+    final response = await _client
+        .get(uri, headers: {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 25));
+    if (response.statusCode != 200) {
+      throw StateError('Driver request failed (HTTP ${response.statusCode}).');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map || decoded['ok'] != true || decoded['data'] is! Map) {
+      throw const FormatException('Unexpected Fantasy drivers response.');
+    }
+    return Map<String, dynamic>.from(decoded['data'] as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> driverPrices(int seasonId) async {
+    final result = <Map<String, dynamic>>[];
+    const pageSize = 250;
+    for (var offset = 0; ; offset += pageSize) {
+      final data = await _driversRequest({
+        'action': 'drivers.list',
+        'fantasy_season_id': '$seasonId',
+        'limit': '$pageSize',
+        'offset': '$offset',
+      });
+      final page = (data['items'] as List? ?? const [])
+          .map((v) => Map<String, dynamic>.from(v as Map))
+          .toList();
+      result.addAll(page);
+      if (page.length < pageSize) break;
+    }
+    return result;
+  }
+
+  Future<List<Map<String, dynamic>>> driverStats(
+    int seasonId,
+    int classId, {
+    bool includeEvents = false,
+  }) async {
+    final data = await _driversRequest({
+      'action': 'drivers.stats',
+      'fantasy_season_id': '$seasonId',
+      'portal_class_id': '$classId',
+      'include_events': includeEvents ? '1' : '0',
+    });
+    return (data['items'] as List? ?? const [])
+        .map((v) => Map<String, dynamic>.from(v as Map))
+        .toList();
+  }
+
   Future<List<FantasySeason>> seasons() async {
     final uri = Uri.parse(seasonsEndpoint)
         .replace(queryParameters: {'action': 'list'});
