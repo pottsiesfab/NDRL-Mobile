@@ -15,6 +15,8 @@ import 'diagnostics_screen.dart';
 import 'about_ndrl_screen.dart';
 import 'news_screen.dart';
 import 'rules_screen.dart';
+import '../services/official_access_service.dart';
+import 'officials_dashboard_screen.dart';
 
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
@@ -32,6 +34,32 @@ class NdrlAppShell extends StatefulWidget {
 
 class _NdrlAppShellState extends State<NdrlAppShell> {
   int _selectedIndex = 0;
+  late final OfficialAccessService _officials;
+
+  @override
+  void initState() {
+    super.initState();
+    _officials = OfficialAccessService(widget.authService);
+    WidgetsBinding.instance.addObserver(_officialsLifecycle);
+  }
+
+  late final WidgetsBindingObserver _officialsLifecycle = _OfficialLifecycle(
+    onResume: () { if (mounted) _officials.refresh(); },
+  );
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(_officialsLifecycle);
+    _officials.dispose();
+    super.dispose();
+  }
+
+  void _openOfficials() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NdrlOfficialsDashboardScreen(officials: _officials),
+    ));
+  }
+
 
   static const _destinations = [
     NavigationDestination(
@@ -127,11 +155,16 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       NdrlStagingScreen(isActive: _selectedIndex == 1),
       const NdrlEventsScreen(),
       const NdrlAlertsScreen(),
-      _MoreScreen(
-        onOpenFeature: _openFeature,
-        onOpenNotificationSettings: _openNotificationSettings,
-        onOpenAccount: _openAccount,
-        onOpenDiagnostics: _openDiagnostics,
+      ListenableBuilder(
+        listenable: _officials,
+        builder: (context, _) => _MoreScreen(
+          officials: _officials,
+          onOpenOfficials: _openOfficials,
+          onOpenFeature: _openFeature,
+          onOpenNotificationSettings: _openNotificationSettings,
+          onOpenAccount: _openAccount,
+          onOpenDiagnostics: _openDiagnostics,
+        ),
       ),
     ];
 
@@ -397,15 +430,28 @@ class NdrlFeatureScreen extends StatelessWidget {
   }
 }
 
+class _OfficialLifecycle extends WidgetsBindingObserver {
+  _OfficialLifecycle({required this.onResume});
+  final VoidCallback onResume;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) onResume();
+  }
+}
+
 class _MoreScreen extends StatelessWidget {
   const _MoreScreen({
     required this.onOpenFeature,
+    required this.officials,
+    required this.onOpenOfficials,
     required this.onOpenNotificationSettings,
     required this.onOpenAccount,
     required this.onOpenDiagnostics,
   });
 
   final void Function(String) onOpenFeature;
+  final OfficialAccessService officials;
+  final VoidCallback onOpenOfficials;
   final VoidCallback onOpenNotificationSettings;
   final VoidCallback onOpenAccount;
   final VoidCallback onOpenDiagnostics;
@@ -438,6 +484,13 @@ class _MoreScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        if (officials.access.enabled)
+          Card(color: ndrlSurface, child: ListTile(
+            leading: const Icon(Icons.shield_outlined, color: ndrlGold),
+            title: const Text('Officials / Race Control'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: onOpenOfficials,
+          )),
         for (final entry in entries)
           Card(
             color: ndrlSurface,
