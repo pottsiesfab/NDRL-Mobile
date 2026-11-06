@@ -6,6 +6,7 @@ import 'notification_settings_screen.dart';
 import 'events_screen.dart';
 import 'sponsors_screen.dart';
 import 'season_points_screen.dart';
+import 'fantasy/fantasy_hub_screen.dart';
 import 'members_screen.dart';
 import '../widgets/sponsor_ad_widget.dart';
 import '../services/auth_service.dart';
@@ -59,7 +60,9 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   void _openFeature(String title) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => title == 'NDRL Members' || title == 'Driver Profiles'
+        builder: (_) => title == 'Fantasy Racing'
+            ? const NdrlFantasyHubScreen()
+            : title == 'NDRL Members' || title == 'Driver Profiles'
             ? const NdrlMembersScreen()
             : title == 'Our Sponsors'
             ? const NdrlSponsorsScreen()
