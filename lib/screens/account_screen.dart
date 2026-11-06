@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../services/auth_service.dart';
 import 'app_shell.dart';
 import 'login_screen.dart';
@@ -45,7 +46,10 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
 
   Future<void> _logout() async {
     if (_loggingOut) return;
-    setState(() { _loggingOut = true; _error = null; });
+    setState(() {
+      _loggingOut = true;
+      _error = null;
+    });
     try {
       await widget.authService.logout();
     } catch (e) {
@@ -59,9 +63,7 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
   Widget build(BuildContext context) {
     final auth = widget.authService;
     if (auth.loading && !auth.signedIn) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (!auth.signedIn) {
       return NdrlLoginScreen(authService: auth);
@@ -81,13 +83,17 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
           const SizedBox(height: 18),
           const Icon(Icons.account_circle_outlined, color: ndrlGold, size: 84),
           const SizedBox(height: 16),
-          Text(name,
+          Text(
+            name,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
-          const Text('Signed in to NDRL',
+          const Text(
+            'Signed in to NDRL',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70)),
+            style: TextStyle(color: Colors.white70),
+          ),
           const SizedBox(height: 28),
           FilledButton.icon(
             onPressed: () => Navigator.of(context).push(
@@ -105,10 +111,14 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
             label: const Text('Log out'),
           ),
           if (_loggingOut) const LinearProgressIndicator(color: ndrlRed),
-          if (_error != null) Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Text(_error!, style: const TextStyle(color: Colors.orangeAccent)),
-          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.orangeAccent),
+              ),
+            ),
         ],
       ),
     );

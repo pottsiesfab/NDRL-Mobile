@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 class NdrlSponsor {
   const NdrlSponsor({
     required this.id,
@@ -17,9 +19,7 @@ class NdrlSponsor {
   final Uri? websiteUrl;
   final Uri? clickUrl;
 
-  static final Uri _devOrigin = Uri.parse(
-    'https://dev.nostalgiadragleague.com',
-  );
+  static final Uri _apiOrigin = Uri.parse('${AppConfig.baseUrl}');
 
   static Uri? _url(Object? value, {bool allowRelative = false}) {
     if (value is! String || value.trim().isEmpty) return null;
@@ -31,17 +31,17 @@ class NdrlSponsor {
         raw.host.isEmpty &&
         value.startsWith('/') &&
         !value.startsWith('//')) {
-      return _devOrigin.resolveUri(raw);
+      return _apiOrigin.resolveUri(raw);
     }
     return null;
   }
 
-  // Directory clicks must use the backend-provided DEV tracking endpoint.
+  // Directory clicks must use the backend-provided tracking endpoint.
   // Never construct tokens or fall back to an untracked website URL.
   static Uri? _directoryClickUrl(Object? value) {
     final url = _url(value);
     if (url == null ||
-        url.host != _devOrigin.host ||
+        url.host != _apiOrigin.host ||
         url.userInfo.isNotEmpty ||
         url.hasPort ||
         url.fragment.isNotEmpty) {

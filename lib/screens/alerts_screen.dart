@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,7 +12,7 @@ import 'notification_settings_screen.dart';
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
-const _api = 'https://dev.nostalgiadragleague.com/api/notify_history_api.php';
+const _api = '${AppConfig.baseUrl}/api/notify_history_api.php';
 const _credentialKey = 'ndrl_dev_device_credential';
 
 class NdrlAlertsScreen extends StatefulWidget {

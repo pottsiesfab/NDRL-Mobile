@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -7,7 +9,7 @@ import 'package:http/http.dart' as http;
 
 import 'device_service.dart';
 
-const _authApi = 'https://dev.nostalgiadragleague.com/api/mobile_auth_api.php';
+const _authApi = '${AppConfig.baseUrl}/api/mobile_auth_api.php';
 const _deviceCredentialKey = 'ndrl_dev_device_credential';
 const _accessKey = 'ndrl_dev_member_access';
 const _refreshKey = 'ndrl_dev_member_refresh';
@@ -285,7 +287,7 @@ class AuthService extends ChangeNotifier {
     Future<http.Response> fetch() => _http
         .get(
           Uri.parse(
-            'https://dev.nostalgiadragleague.com/api/mobile_profile_api.php?action=me',
+            '${AppConfig.baseUrl}/api/mobile_profile_api.php?action=me',
           ),
           headers: {
             'Accept': 'application/json',
@@ -330,7 +332,7 @@ class AuthService extends ChangeNotifier {
     Future<http.Response> send() => _http
         .post(
           Uri.parse(
-            'https://dev.nostalgiadragleague.com/api/mobile_profile_api.php?action=update_profile',
+            '${AppConfig.baseUrl}/api/mobile_profile_api.php?action=update_profile',
           ),
           headers: {
             'Accept': 'application/json',
@@ -373,8 +375,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  static const _profileApi =
-      'https://dev.nostalgiadragleague.com/api/mobile_profile_api.php';
+  static const _profileApi = '${AppConfig.baseUrl}/api/mobile_profile_api.php';
 
   Future<Map<String, dynamic>> profileAction(
     String action,

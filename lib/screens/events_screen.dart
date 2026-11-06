@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,8 +12,7 @@ const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
 const _seasonId = 3; // DEV season; do not point this screen at production.
-const _catalogUrl =
-    'https://dev.nostalgiadragleague.com/api/notify_catalog_api.php';
+const _catalogUrl = '${AppConfig.baseUrl}/api/notify_catalog_api.php';
 
 class NdrlEventsScreen extends StatefulWidget {
   const NdrlEventsScreen({super.key});

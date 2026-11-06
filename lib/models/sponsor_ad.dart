@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 class SponsorAd {
   const SponsorAd({
     required this.adId,
@@ -23,9 +25,7 @@ class SponsorAd {
   final String? impressionToken;
   final int weight;
 
-  static final Uri _devOrigin = Uri.parse(
-    'https://dev.nostalgiadragleague.com',
-  );
+  static final Uri _apiOrigin = Uri.parse('${AppConfig.baseUrl}');
 
   static Uri _imageUrl(Object? value) {
     if (value is! String || value.trim().isEmpty) {
@@ -33,7 +33,7 @@ class SponsorAd {
     }
     final raw = Uri.tryParse(value.trim());
     if (raw == null) throw const FormatException('Invalid image_url');
-    final uri = raw.hasScheme ? raw : _devOrigin.resolveUri(raw);
+    final uri = raw.hasScheme ? raw : _apiOrigin.resolveUri(raw);
     if (uri.scheme != 'https' ||
         uri.host.isEmpty ||
         (raw.hasAuthority && !raw.hasScheme)) {
@@ -58,8 +58,8 @@ class SponsorAd {
 
   factory SponsorAd.fromJson(Map<String, dynamic> json) {
     final clickUrl = _httpsUrl(json['click_url'], 'click_url');
-    // Prevent an accidental production click while developing against DEV.
-    if (clickUrl.host != 'dev.nostalgiadragleague.com' ||
+    // Require click tracking to use the configured API host.
+    if (clickUrl.host != Uri.parse(AppConfig.baseUrl).host ||
         clickUrl.path != '/api/sponsor_click.php') {
       throw const FormatException('Unexpected sponsor click endpoint');
     }

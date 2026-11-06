@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -6,8 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-const _deviceApi =
-    'https://dev.nostalgiadragleague.com/api/notify_device_api.php';
+const _deviceApi = '${AppConfig.baseUrl}/api/notify_device_api.php';
 const _credentialKey = 'ndrl_dev_device_credential';
 const _deviceIdKey = 'ndrl_dev_device_id';
 

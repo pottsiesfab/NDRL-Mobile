@@ -75,9 +75,11 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   }
 
   void _openDiagnostics() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => NdrlDiagnosticsScreen(authService: widget.authService),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NdrlDiagnosticsScreen(authService: widget.authService),
+      ),
+    );
   }
 
   void _openAccount() {

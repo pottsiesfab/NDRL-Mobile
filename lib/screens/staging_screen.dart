@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,7 +12,7 @@ const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
 const _apiUrl =
-    'https://dev.nostalgiadragleague.com/api/notify_staging_board_api.php?event_id=14';
+    '${AppConfig.baseUrl}/api/notify_staging_board_api.php?event_id=14';
 
 class NdrlStagingScreen extends StatefulWidget {
   const NdrlStagingScreen({super.key, this.isActive = false});

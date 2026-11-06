@@ -1,10 +1,12 @@
+import '../config/app_config.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-const _api = 'https://dev.nostalgiadragleague.com/api/standings_public_api.php';
+const _api = '${AppConfig.baseUrl}/api/standings_public_api.php';
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);

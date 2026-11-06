@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -51,7 +53,7 @@ List<Map<String, dynamic>> fantasyRosterEvents(dynamic raw) {
 class NdrlFantasyService {
   // DEV only. Switch to production after testing and approval.
   static const String seasonsEndpoint =
-      'https://dev.nostalgiadragleague.com/fantasy/api/seasons_api.php';
+      '${AppConfig.baseUrl}/fantasy/api/seasons_api.php';
   final http.Client _client = http.Client();
   void dispose() => _client.close();
 
@@ -60,19 +62,18 @@ class NdrlFantasyService {
     required int fantasySeasonId,
   }) async {
     final uri =
-        Uri.parse(
-          'https://dev.nostalgiadragleague.com/fantasy/api/mobile_fantasy_api.php',
-        ).replace(
-          queryParameters: {
-            'action': 'my_stats',
-            'fantasy_season_id': '$fantasySeasonId',
-          },
-        );
+        Uri.parse('${AppConfig.baseUrl}/fantasy/api/mobile_fantasy_api.php')
+            .replace(
+              queryParameters: {
+                'action': 'my_stats',
+                'fantasy_season_id': '$fantasySeasonId',
+              },
+            );
     return authService.authorizedGet(uri);
   }
 
   static const String mobileEndpoint =
-      'https://dev.nostalgiadragleague.com/fantasy/api/mobile_fantasy_api.php';
+      '${AppConfig.baseUrl}/fantasy/api/mobile_fantasy_api.php';
 
   Future<Map<String, dynamic>> myRosters({
     required AuthService authService,
@@ -118,7 +119,7 @@ class NdrlFantasyService {
   );
 
   static const String standingsEndpoint =
-      'https://dev.nostalgiadragleague.com/fantasy/api/standings_api.php';
+      '${AppConfig.baseUrl}/fantasy/api/standings_api.php';
 
   Future<Map<String, dynamic>> _standingsRequest(
     Map<String, String> params,
@@ -157,7 +158,7 @@ class NdrlFantasyService {
       });
 
   static const String driversEndpoint =
-      'https://dev.nostalgiadragleague.com/fantasy/api/drivers_api.php';
+      '${AppConfig.baseUrl}/fantasy/api/drivers_api.php';
 
   Future<Map<String, dynamic>> _driversRequest(
     Map<String, String> params,
