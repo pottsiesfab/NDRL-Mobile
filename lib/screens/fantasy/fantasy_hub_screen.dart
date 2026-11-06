@@ -6,6 +6,8 @@ import '../../services/fantasy_service.dart';
 import '../../services/auth_service.dart';
 import 'fantasy_my_team_screen.dart';
 import 'fantasy_driver_research_screen.dart';
+import 'fantasy_roster_screen.dart';
+import 'fantasy_my_rosters_screen.dart';
 
 const _background = Color(0xFF080A12);
 const _panel = Color(0xFF101525);
@@ -26,6 +28,9 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
   int? _selectedSeasonId;
   bool _loading = true;
   String? _error;
+  bool _pickerAvailable = false;
+  bool _checkingPicker = false;
+  int? _pickerEventId;
 
   @override
   void initState() {
@@ -48,12 +53,51 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
         }
         _loading = false;
       });
+      await _checkPicker();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _error = e.toString();
       });
+    }
+  }
+
+  Future<void> _checkPicker() async {
+    final seasonId = _selectedSeasonId;
+    setState(() {
+      _pickerAvailable = false;
+      _pickerEventId = null;
+      _checkingPicker = true;
+    });
+    try {
+      if (!widget.authService.signedIn || seasonId == null) return;
+      final result = await _service.myRosters(
+        authService: widget.authService,
+        fantasySeasonId: seasonId,
+      );
+      if (result['has_team'] != true) return;
+      final events = fantasyRosterEvents(result['rosters']);
+      if (events.isEmpty) return;
+      final id = fantasyEventId(events.first);
+      final options = await _service.rosterOptions(
+        authService: widget.authService,
+        fantasySeasonId: seasonId,
+        fantasyEventId: id,
+      );
+      if (!mounted || _selectedSeasonId != seasonId) return;
+      setState(() {
+        _pickerAvailable =
+            (options['editing'] is Map) &&
+            (options['editing'] as Map)['can_edit'] == true;
+        _pickerEventId = _pickerAvailable ? id : null;
+      });
+    } catch (_) {
+      // Fail closed. A failed availability check must never enable editing.
+    } finally {
+      if (mounted && _selectedSeasonId == seasonId) {
+        setState(() => _checkingPicker = false);
+      }
     }
   }
 
@@ -79,6 +123,32 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
           builder: (_) => NdrlFantasyDriverResearchScreen(season: season),
         ),
       );
+      return;
+    }
+    if (title == 'My Rosters' || title == 'Roster Picker') {
+      final season = _seasons
+          .where((s) => s.id == _selectedSeasonId)
+          .firstOrNull;
+      if (season == null) return;
+      if (title == 'Roster Picker' && !_pickerAvailable) return;
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute<void>(
+              builder: (_) => title == 'My Rosters'
+                  ? NdrlFantasyMyRostersScreen(
+                      authService: widget.authService,
+                      season: season,
+                    )
+                  : NdrlFantasyRosterScreen(
+                      authService: widget.authService,
+                      season: season,
+                      initialEventId: _pickerEventId,
+                    ),
+            ),
+          )
+          .then((_) {
+            if (mounted) _checkPicker();
+          });
       return;
     }
     if (title == 'My Team') {
@@ -263,8 +333,10 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
                             ),
                           )
                           .toList(),
-                      onChanged: (value) =>
-                          setState(() => _selectedSeasonId = value),
+                      onChanged: (value) {
+                        setState(() => _selectedSeasonId = value);
+                        _checkPicker();
+                      },
                     ),
                   if (season != null)
                     Padding(
@@ -307,8 +379,13 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
             ),
             _tile(
               'Roster Picker',
-              'Choose drivers and your captain',
+              _checkingPicker
+                  ? 'Checking event availability…'
+                  : (_pickerAvailable
+                        ? 'Choose drivers and your captain'
+                        : 'No open roster available'),
               Icons.edit_note_outlined,
+              enabled: _pickerAvailable,
             ),
             const SizedBox(height: 20),
             const Text(
@@ -352,14 +429,19 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
     );
   }
 
-  Widget _tile(String title, String subtitle, IconData icon) => Padding(
+  Widget _tile(
+    String title,
+    String subtitle,
+    IconData icon, {
+    bool enabled = true,
+  }) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: Material(
       color: _panel,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _openDestination(title),
+        onTap: enabled ? () => _openDestination(title) : null,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
           decoration: BoxDecoration(
@@ -368,7 +450,7 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
           ),
           child: Row(
             children: [
-              Icon(icon, color: _gold, size: 28),
+              Icon(icon, color: enabled ? _gold : Colors.white30, size: 28),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -376,8 +458,8 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: enabled ? Colors.white : Colors.white38,
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                       ),

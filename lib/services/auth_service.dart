@@ -224,6 +224,59 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Authenticated JSON POST; refresh once on HTTP 401.
+  /// On timeout, caller should reload server state before retrying a save.
+  Future<Map<String, dynamic>> authorizedPost(
+    Uri uri,
+    Map<String, dynamic> body,
+  ) async {
+    if (_access == null) {
+      if (_refresh == null) throw const AuthException('Please sign in');
+      await refresh();
+    }
+    Future<http.Response> send() => _http
+        .post(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_access',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 25));
+    try {
+      var response = await send();
+      if (response.statusCode == 401) {
+        await refresh();
+        response = await send();
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const AuthException('Unexpected server response');
+      }
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300 ||
+          decoded['success'] != true) {
+        throw AuthException(
+          decoded['error']?.toString() ??
+              'Request failed (HTTP ${response.statusCode})',
+        );
+      }
+      return decoded;
+    } on AuthException {
+      rethrow;
+    } on TimeoutException {
+      throw const AuthException(
+        'Request timed out; reload roster before retrying',
+      );
+    } on FormatException {
+      throw const AuthException('Invalid server response');
+    } catch (_) {
+      throw const AuthException('Unable to connect to NDRL DEV');
+    }
+  }
+
   Future<Map<String, dynamic>> loadMemberProfile() async {
     if (_access == null) {
       if (_refresh == null) throw const AuthException('Please sign in');

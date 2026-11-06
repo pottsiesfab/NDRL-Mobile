@@ -24,6 +24,30 @@ class FantasySeason {
   );
 }
 
+/// Sort season events newest first. Event ID breaks ties when dates are absent.
+int fantasyEventId(Map<String, dynamic> event) =>
+    int.tryParse('${event['fantasy_event_id']}') ?? 0;
+
+List<Map<String, dynamic>> fantasyRosterEvents(dynamic raw) {
+  if (raw is! List) return <Map<String, dynamic>>[];
+  final events = raw
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+  String eventDate(Map<String, dynamic> e) =>
+      '${e['event_date'] ?? e['date'] ?? e['lock_date'] ?? ''}';
+  events.sort((a, b) {
+    final da = eventDate(a);
+    final db = eventDate(b);
+    if (da.isNotEmpty && db.isNotEmpty) {
+      final byDate = db.compareTo(da);
+      if (byDate != 0) return byDate;
+    }
+    return fantasyEventId(b).compareTo(fantasyEventId(a));
+  });
+  return events;
+}
+
 class NdrlFantasyService {
   // DEV only. Switch to production after testing and approval.
   static const String seasonsEndpoint =
@@ -46,6 +70,52 @@ class NdrlFantasyService {
         );
     return authService.authorizedGet(uri);
   }
+
+  static const String mobileEndpoint =
+      'https://dev.nostalgiadragleague.com/fantasy/api/mobile_fantasy_api.php';
+
+  Future<Map<String, dynamic>> myRosters({
+    required AuthService authService,
+    required int fantasySeasonId,
+  }) => authService.authorizedGet(
+    Uri.parse(mobileEndpoint).replace(
+      queryParameters: {
+        'action': 'my_rosters',
+        'fantasy_season_id': '$fantasySeasonId',
+      },
+    ),
+  );
+
+  Future<Map<String, dynamic>> rosterOptions({
+    required AuthService authService,
+    required int fantasySeasonId,
+    required int fantasyEventId,
+  }) => authService.authorizedGet(
+    Uri.parse(mobileEndpoint).replace(
+      queryParameters: {
+        'action': 'roster_options',
+        'fantasy_season_id': '$fantasySeasonId',
+        'fantasy_event_id': '$fantasyEventId',
+      },
+    ),
+  );
+
+  Future<Map<String, dynamic>> rosterWrite({
+    required AuthService authService,
+    required int fantasySeasonId,
+    required int fantasyEventId,
+    required List<Map<String, dynamic>> picks,
+    required bool save,
+  }) => authService.authorizedPost(
+    Uri.parse(mobileEndpoint).replace(
+      queryParameters: {'action': save ? 'roster_save' : 'roster_validate'},
+    ),
+    {
+      'fantasy_season_id': fantasySeasonId,
+      'fantasy_event_id': fantasyEventId,
+      'picks': picks,
+    },
+  );
 
   static const String driversEndpoint =
       'https://dev.nostalgiadragleague.com/fantasy/api/drivers_api.php';
