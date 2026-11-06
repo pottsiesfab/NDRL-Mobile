@@ -11,6 +11,7 @@ import 'members_screen.dart';
 import '../widgets/sponsor_ad_widget.dart';
 import '../services/auth_service.dart';
 import 'account_screen.dart';
+import 'diagnostics_screen.dart';
 
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
@@ -73,6 +74,12 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
     );
   }
 
+  void _openDiagnostics() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NdrlDiagnosticsScreen(authService: widget.authService),
+    ));
+  }
+
   void _openAccount() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -111,6 +118,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
         onOpenFeature: _openFeature,
         onOpenNotificationSettings: _openNotificationSettings,
         onOpenAccount: _openAccount,
+        onOpenDiagnostics: _openDiagnostics,
       ),
     ];
 
@@ -381,11 +389,13 @@ class _MoreScreen extends StatelessWidget {
     required this.onOpenFeature,
     required this.onOpenNotificationSettings,
     required this.onOpenAccount,
+    required this.onOpenDiagnostics,
   });
 
   final void Function(String) onOpenFeature;
   final VoidCallback onOpenNotificationSettings;
   final VoidCallback onOpenAccount;
+  final VoidCallback onOpenDiagnostics;
 
   @override
   Widget build(BuildContext context) {
@@ -396,6 +406,7 @@ class _MoreScreen extends StatelessWidget {
       ('Fantasy Racing', Icons.sports_score),
       ('NDRL Members', Icons.people_outline),
       ('Notification Settings', Icons.settings_outlined),
+      ('Diagnostics', Icons.monitor_heart_outlined),
       ('About NDRL', Icons.info_outline),
     ];
 
@@ -421,6 +432,8 @@ class _MoreScreen extends StatelessWidget {
               onTap: () {
                 if (entry.$1 == 'My Account') {
                   onOpenAccount();
+                } else if (entry.$1 == 'Diagnostics') {
+                  onOpenDiagnostics();
                 } else if (entry.$1 == 'Notification Settings') {
                   onOpenNotificationSettings();
                 } else {

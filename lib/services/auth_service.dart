@@ -39,6 +39,15 @@ class AuthService extends ChangeNotifier {
   String? _refresh;
 
   bool get signedIn => account != null;
+
+  /// DEV diagnostics only. Never log or include this token in support reports.
+  /// Release builds intentionally cannot reveal bearer credentials.
+  Future<String?> devDiagnosticAccessToken() async {
+    if (kReleaseMode || !_authApi.contains('://dev.')) return null;
+    if (_access == null && _refresh != null) await refresh();
+    return _access;
+  }
+
   void _notify() {
     if (!_disposed) notifyListeners();
   }
