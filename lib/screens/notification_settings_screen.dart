@@ -88,11 +88,12 @@ class _NdrlNotificationSettingsScreenState
 
   Future<void> _load() async {
     if (_saving.isNotEmpty) return;
-    if (mounted)
+    if (mounted) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    }
     try {
       final result = await _request('status');
       final rawClasses = result['classes'];

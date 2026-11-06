@@ -118,8 +118,9 @@ class _RosterState extends State<NdrlFantasyRosterScreen> {
         final driver = byId[id];
         if (driver == null) continue;
         selected[_int(driver['class_id'])] = driver;
-        if (pick['is_captain'] == true || _int(pick['is_captain']) == 1)
+        if (pick['is_captain'] == true || _int(pick['is_captain']) == 1) {
           captain = id;
+        }
       }
       if (!mounted) return;
       setState(() {
@@ -259,8 +260,9 @@ class _RosterState extends State<NdrlFantasyRosterScreen> {
       canPop: !_dirty,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop || !_dirty) return;
-        if (await _confirmDiscard() && context.mounted)
+        if (await _confirmDiscard() && context.mounted) {
           Navigator.of(context).pop();
+        }
       },
       child: Scaffold(
         backgroundColor: _bg,
@@ -469,8 +471,9 @@ class _RosterState extends State<NdrlFantasyRosterScreen> {
                                         );
                                       }
                                       if (_captainId == chosenId &&
-                                          id != chosenId)
+                                          id != chosenId) {
                                         _captainId = null;
+                                      }
                                       _dirty = true;
                                     }),
                             ),

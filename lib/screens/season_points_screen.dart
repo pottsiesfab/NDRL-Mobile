@@ -72,8 +72,9 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
 
   List<Map<String, dynamic>> _items(Map<String, dynamic> payload) {
     final raw = payload['items'];
-    if (raw is! List)
+    if (raw is! List) {
       throw const FormatException('Standings API returned no items list');
+    }
     return raw.map((item) {
       if (item is! Map) throw const FormatException('Invalid standings entry');
       return Map<String, dynamic>.from(item);
@@ -86,15 +87,17 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
 
   Future<void> _initialize() async {
     final generation = ++_generation;
-    if (mounted)
+    if (mounted) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    }
     try {
       final seasons = _items(await _get('season.list', {'limit': '200'}));
-      if (seasons.isEmpty)
+      if (seasons.isEmpty) {
         throw StateError('No championship seasons available');
+      }
       seasons.sort(
         (a, b) => _int(b['season_id']).compareTo(_int(a['season_id'])),
       );
@@ -122,11 +125,13 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
         _standings = standings;
       });
     } catch (e) {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _error = _message(e));
+      }
     } finally {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _loading = false);
+      }
     }
   }
 
@@ -173,14 +178,17 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
     });
     try {
       final standings = await _fetchStandings(_seasonId!, value);
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _standings = standings);
+      }
     } catch (e) {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _error = _message(e));
+      }
     } finally {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _loading = false);
+      }
     }
   }
 
@@ -380,13 +388,15 @@ class _DriverStatsScreenState extends State<_DriverStatsScreen> {
         throw StateError('Unable to load driver statistics');
       }
       final data = decoded['message'];
-      if (mounted)
+      if (mounted) {
         setState(() => _data = data is Map<String, dynamic> ? data : decoded);
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = 'Driver statistics are temporarily unavailable.',
         );
+      }
     }
   }
 

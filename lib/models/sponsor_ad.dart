@@ -25,7 +25,7 @@ class SponsorAd {
   final String? impressionToken;
   final int weight;
 
-  static final Uri _apiOrigin = Uri.parse('${AppConfig.baseUrl}');
+  static final Uri _apiOrigin = Uri.parse(AppConfig.baseUrl);
 
   static Uri _imageUrl(Object? value) {
     if (value is! String || value.trim().isEmpty) {

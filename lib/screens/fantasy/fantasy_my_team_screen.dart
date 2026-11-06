@@ -74,8 +74,9 @@ class _NdrlFantasyMyTeamScreenState extends State<NdrlFantasyMyTeamScreen> {
 
   String _value(dynamic v, {int decimals = 0, String prefix = ''}) {
     if (v == null) return '—';
-    if (v is num)
+    if (v is num) {
       return '$prefix${decimals == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(decimals)}';
+    }
     return '$prefix$v';
   }
 

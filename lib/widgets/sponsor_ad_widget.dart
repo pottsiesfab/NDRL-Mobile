@@ -64,8 +64,9 @@ class _NdrlSponsorAdWidgetState extends State<NdrlSponsorAdWidget>
     final ads = _batch?.ads;
     if (ads == null ||
         ads.isEmpty ||
-        ads[_currentIndex].imageUrl.toString() != imageUrl)
+        ads[_currentIndex].imageUrl.toString() != imageUrl) {
       return;
+    }
     _loadedImageUrl = imageUrl;
     _maybeReportImpression();
   }

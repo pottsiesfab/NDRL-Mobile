@@ -264,8 +264,9 @@ class _StandingsState extends State<NdrlFantasyStandingsScreen> {
 
   Widget _eventSection() {
     final events = _events;
-    if (events.isEmpty)
+    if (events.isEmpty) {
       return _message('No scored event standings are available yet.');
+    }
     final event = _object(_eventData?['event']);
     final teams = _objects(_eventData?['teams']);
     return Column(

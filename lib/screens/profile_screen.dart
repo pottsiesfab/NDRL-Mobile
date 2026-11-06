@@ -119,9 +119,10 @@ class _NdrlProfileScreenState extends State<NdrlProfileScreen> {
       );
       if (mounted) await _loadProfile();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('$e')));
+      }
     } finally {
       if (mounted) setState(() => _changingPhoto = false);
     }
@@ -166,9 +167,10 @@ class _NdrlProfileScreenState extends State<NdrlProfileScreen> {
       });
       if (mounted) await _loadProfile();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('$e')));
+      }
     }
   }
 
@@ -341,7 +343,7 @@ class _NdrlProfileScreenState extends State<NdrlProfileScreen> {
         ),
         if (seasons.isNotEmpty)
           DropdownButtonFormField<int>(
-            value: _seasonId,
+            initialValue: _seasonId,
             decoration: const InputDecoration(
               labelText: 'Season',
               border: OutlineInputBorder(),
@@ -511,9 +513,10 @@ class _NdrlProfileScreenState extends State<NdrlProfileScreen> {
     try {
       await widget.authService.logout(allDevices: all);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     } finally {
       if (mounted) setState(() => _loggingOut = false);
     }

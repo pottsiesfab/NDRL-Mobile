@@ -19,7 +19,7 @@ class NdrlSponsor {
   final Uri? websiteUrl;
   final Uri? clickUrl;
 
-  static final Uri _apiOrigin = Uri.parse('${AppConfig.baseUrl}');
+  static final Uri _apiOrigin = Uri.parse(AppConfig.baseUrl);
 
   static Uri? _url(Object? value, {bool allowRelative = false}) {
     if (value is! String || value.trim().isEmpty) return null;

@@ -72,6 +72,56 @@ class NdrlFantasyService {
     return authService.authorizedGet(uri);
   }
 
+  static const String teamsEndpoint =
+      '${AppConfig.baseUrl}/fantasy/api/mobile_teams_api.php';
+
+  Future<Map<String, dynamic>> otherTeams({
+    required AuthService authService,
+    required int fantasySeasonId,
+    String query = '',
+    int offset = 0,
+  }) => authService.authorizedGet(
+    Uri.parse(teamsEndpoint).replace(
+      queryParameters: {
+        'action': 'teams.list',
+        'fantasy_season_id': '$fantasySeasonId',
+        'q': query,
+        'offset': '$offset',
+        'limit': '50',
+      },
+    ),
+  );
+
+  Future<Map<String, dynamic>> otherTeamProfile({
+    required AuthService authService,
+    required int fantasySeasonId,
+    required int fantasyTeamId,
+  }) => authService.authorizedGet(
+    Uri.parse(teamsEndpoint).replace(
+      queryParameters: {
+        'action': 'teams.profile',
+        'fantasy_season_id': '$fantasySeasonId',
+        'fantasy_team_id': '$fantasyTeamId',
+      },
+    ),
+  );
+
+  Future<Map<String, dynamic>> otherTeamRoster({
+    required AuthService authService,
+    required int fantasySeasonId,
+    required int fantasyTeamId,
+    required int fantasyEventId,
+  }) => authService.authorizedGet(
+    Uri.parse(teamsEndpoint).replace(
+      queryParameters: {
+        'action': 'teams.roster',
+        'fantasy_season_id': '$fantasySeasonId',
+        'fantasy_team_id': '$fantasyTeamId',
+        'fantasy_event_id': '$fantasyEventId',
+      },
+    ),
+  );
+
   static const String mobileEndpoint =
       '${AppConfig.baseUrl}/fantasy/api/mobile_fantasy_api.php';
 
@@ -228,8 +278,9 @@ class NdrlFantasyService {
       throw const FormatException('Unexpected Fantasy seasons response.');
     }
     final raw = (decoded['data'] as Map)['seasons'];
-    if (raw is! List)
+    if (raw is! List) {
       throw const FormatException('Fantasy seasons list missing.');
+    }
     final seasons = raw
         .map(
           (item) =>

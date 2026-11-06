@@ -103,8 +103,9 @@ class _MyRostersState extends State<NdrlFantasyMyRostersScreen> {
   }
 
   Future<void> _loadDetails(int eventId) async {
-    if (_details.containsKey(eventId) || _loadingDetails.contains(eventId))
+    if (_details.containsKey(eventId) || _loadingDetails.contains(eventId)) {
       return;
+    }
     setState(() => _loadingDetails.add(eventId));
     try {
       final data = await _service.rosterOptions(
@@ -277,8 +278,9 @@ class _MyRostersState extends State<NdrlFantasyMyRostersScreen> {
                     iconColor: _gold,
                     collapsedIconColor: _gold,
                     onExpansionChanged: (expanded) {
-                      if (expanded)
+                      if (expanded) {
                         _loadDetails(fantasyEventId(_events[index]));
+                      }
                     },
                     title: Text(
                       '${_events[index]['event_name'] ?? 'Fantasy Event'}',

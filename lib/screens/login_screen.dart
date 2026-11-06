@@ -33,11 +33,12 @@ class _NdrlLoginScreenState extends State<NdrlLoginScreen> {
     try {
       await task();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(
           () =>
               _error = e is AuthException ? e.message : 'Something went wrong',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

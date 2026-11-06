@@ -79,11 +79,12 @@ class _NdrlAlertsScreenState extends State<NdrlAlertsScreen> {
 
   Future<void> _refresh() async {
     final generation = ++_requestGeneration;
-    if (mounted)
+    if (mounted) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    }
     try {
       final result = await _fetch();
       final parsed = _parsePage(result);

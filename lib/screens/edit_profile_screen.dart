@@ -174,7 +174,7 @@ class _NdrlEditProfileScreenState extends State<NdrlEditProfileScreen> {
           _field('postal_code'),
           _field('country'),
           DropdownButtonFormField<String>(
-            value: _contactMethod,
+            initialValue: _contactMethod,
             decoration: const InputDecoration(
               labelText: 'Preferred contact method',
               border: OutlineInputBorder(),

@@ -96,8 +96,9 @@ class _DriverResearchState extends State<NdrlFantasyDriverResearchScreen> {
     final query = _search.text.trim().toLowerCase();
     final grouped = <int, List<Map<String, dynamic>>>{};
     for (final driver in _drivers) {
-      if (!'${driver['display_name'] ?? ''}'.toLowerCase().contains(query))
+      if (!'${driver['display_name'] ?? ''}'.toLowerCase().contains(query)) {
         continue;
+      }
       grouped
           .putIfAbsent(_number(driver['portal_class_id']), () => [])
           .add(driver);
@@ -254,8 +255,9 @@ class _DriverResearchState extends State<NdrlFantasyDriverResearchScreen> {
                           color: _gold,
                         ),
                         onTap: () => setState(() {
-                          if (!_expanded.add(classId))
+                          if (!_expanded.add(classId)) {
                             _expanded.remove(classId);
+                          }
                         }),
                       ),
                       if (expanded)

@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 
 import '../services/auth_service.dart';
 
-const _base = '${AppConfig.baseUrl}';
+const _base = AppConfig.baseUrl;
 const _background = Color(0xFF111111);
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
@@ -294,7 +294,7 @@ class _NdrlDiagnosticsScreenState extends State<NdrlDiagnosticsScreen> {
                 OutlinedButton.icon(
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: _token!));
-                    if (context.mounted)
+                    if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
@@ -302,6 +302,7 @@ class _NdrlDiagnosticsScreenState extends State<NdrlDiagnosticsScreen> {
                           ),
                         ),
                       );
+                    }
                   },
                   icon: const Icon(Icons.copy),
                   label: const Text('Copy DEV token'),
@@ -351,12 +352,13 @@ class _NdrlDiagnosticsScreenState extends State<NdrlDiagnosticsScreen> {
               OutlinedButton.icon(
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: _report()));
-                  if (context.mounted)
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Redacted diagnostic report copied'),
                       ),
                     );
+                  }
                 },
                 icon: const Icon(Icons.copy_all),
                 label: const Text('Copy safe support report'),
