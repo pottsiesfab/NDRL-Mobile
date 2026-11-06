@@ -8,6 +8,7 @@ import 'fantasy_my_team_screen.dart';
 import 'fantasy_driver_research_screen.dart';
 import 'fantasy_roster_screen.dart';
 import 'fantasy_my_rosters_screen.dart';
+import 'fantasy_standings_screen.dart';
 
 const _background = Color(0xFF080A12);
 const _panel = Color(0xFF101525);
@@ -107,7 +108,25 @@ class _NdrlFantasyHubScreenState extends State<NdrlFantasyHubScreen> {
     super.dispose();
   }
 
+  void _openStandings({required bool showEvents}) {
+    final season = _seasons.where((s) => s.id == _selectedSeasonId).firstOrNull;
+    if (season == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NdrlFantasyStandingsScreen(
+          season: season,
+          showEventsInitially: showEvents,
+        ),
+      ),
+    );
+  }
+
   void _openDestination(String title) {
+    if (title == 'Season Standings' || title == 'Events') {
+      _openStandings(showEvents: title == 'Events');
+      return;
+    }
+
     if (title == 'Driver Pricing' || title == 'Driver Stats') {
       final season = _seasons
           .where((s) => s.id == _selectedSeasonId)

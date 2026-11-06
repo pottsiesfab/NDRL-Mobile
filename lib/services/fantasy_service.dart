@@ -117,6 +117,45 @@ class NdrlFantasyService {
     },
   );
 
+  static const String standingsEndpoint =
+      'https://dev.nostalgiadragleague.com/fantasy/api/standings_api.php';
+
+  Future<Map<String, dynamic>> _standingsRequest(
+    Map<String, String> params,
+  ) async {
+    final uri = Uri.parse(standingsEndpoint).replace(queryParameters: params);
+    final response = await _client
+        .get(uri, headers: {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 25));
+    if (response.statusCode != 200) {
+      throw StateError(
+        'Standings request failed (HTTP ${response.statusCode}).',
+      );
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map || decoded['ok'] != true || decoded['data'] is! Map) {
+      throw const FormatException('Unexpected Fantasy standings response.');
+    }
+    return Map<String, dynamic>.from(decoded['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> seasonStandings(int seasonId) =>
+      _standingsRequest({
+        'action': 'season.standings',
+        'fantasy_season_id': '$seasonId',
+      });
+
+  Future<Map<String, dynamic>> eventStandings(int eventId) => _standingsRequest(
+    {'action': 'event.meta', 'fantasy_event_id': '$eventId'},
+  );
+
+  Future<Map<String, dynamic>> rosterScoreDetails(int rosterId, int eventId) =>
+      _standingsRequest({
+        'action': 'roster.meta',
+        'fantasy_roster_id': '$rosterId',
+        'fantasy_event_id': '$eventId',
+      });
+
   static const String driversEndpoint =
       'https://dev.nostalgiadragleague.com/fantasy/api/drivers_api.php';
 
