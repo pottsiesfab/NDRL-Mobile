@@ -12,6 +12,9 @@ import '../widgets/sponsor_ad_widget.dart';
 import '../services/auth_service.dart';
 import 'account_screen.dart';
 import 'diagnostics_screen.dart';
+import 'about_ndrl_screen.dart';
+import 'news_screen.dart';
+import 'rules_screen.dart';
 
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
@@ -61,7 +64,15 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   void _openFeature(String title) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => title == 'Fantasy Racing'
+        builder: (_) => title == 'Contact Us'
+            ? const NdrlAboutScreen(contactsOnly: true)
+            : title == 'NDRL Rules'
+            ? const NdrlRulesScreen()
+            : title == 'NDRL News'
+            ? const NdrlNewsScreen()
+            : title == 'About NDRL'
+            ? const NdrlAboutScreen()
+            : title == 'Fantasy Racing'
             ? NdrlFantasyHubScreen(authService: widget.authService)
             : title == 'NDRL Members' || title == 'Driver Profiles'
             ? const NdrlMembersScreen()
@@ -410,6 +421,9 @@ class _MoreScreen extends StatelessWidget {
       ('Notification Settings', Icons.settings_outlined),
       ('Diagnostics', Icons.monitor_heart_outlined),
       ('About NDRL', Icons.info_outline),
+      ('Contact Us', Icons.contact_phone_outlined),
+      ('NDRL News', Icons.newspaper_outlined),
+      ('NDRL Rules', Icons.menu_book_outlined),
     ];
 
     return ListView(
@@ -445,7 +459,11 @@ class _MoreScreen extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 24),
-        const SponsorPlacement(),
+        const NdrlSponsorAdWidget(
+          placement: 'home_featured',
+          isActive: true,
+          heading: 'FEATURED NDRL PARTNER',
+        ),
       ],
     );
   }

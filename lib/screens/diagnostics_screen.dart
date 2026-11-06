@@ -7,8 +7,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/auth_service.dart';
+import '../services/app_update_service.dart';
 
 const _base = AppConfig.baseUrl;
 const _background = Color(0xFF111111);
@@ -38,11 +40,16 @@ class _NdrlDiagnosticsScreenState extends State<NdrlDiagnosticsScreen> {
   String? _token;
   DateTime? _checkedAt;
   List<_CheckResult> _results = [];
+  PackageInfo? _packageInfo;
+  AppUpdatePolicy? _versionPolicy;
+  bool _checkingVersion = false;
+  String? _versionError;
 
   @override
   void initState() {
     super.initState();
     widget.authService.addListener(_onAuthChanged);
+    unawaited(_refreshVersion());
   }
 
   void _onAuthChanged() {
@@ -59,6 +66,42 @@ class _NdrlDiagnosticsScreenState extends State<NdrlDiagnosticsScreen> {
   void dispose() {
     widget.authService.removeListener(_onAuthChanged);
     super.dispose();
+  }
+
+  Future<void> _refreshVersion() async {
+    if (_checkingVersion) return;
+    setState(() {
+      _checkingVersion = true;
+      _versionError = null;
+    });
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final policy = await AppUpdateService.check();
+      if (!mounted) return;
+      setState(() {
+        _packageInfo = info;
+        _versionPolicy = policy;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _versionError = e.toString());
+    } finally {
+      if (mounted) setState(() => _checkingVersion = false);
+    }
+  }
+
+  String get _versionStatus {
+    final p = _versionPolicy;
+    if (p == null) return _checkingVersion ? 'Checking...' : 'Unavailable';
+    if (p.offline) return 'Offline / cached (${p.status})';
+    switch (p.status) {
+      case 'mandatory':
+        return 'Mandatory update required';
+      case 'optional':
+        return 'Optional update available';
+      default:
+        return 'Current';
+    }
   }
 
   Future<void> _revealToken() async {
@@ -184,12 +227,20 @@ class _NdrlDiagnosticsScreenState extends State<NdrlDiagnosticsScreen> {
 
   String _report() {
     final account = widget.authService.account;
+    final p = _versionPolicy;
     final lines = <String>[
       'NDRL Mobile Diagnostics',
       'Environment: ${AppConfig.environment.toUpperCase()}',
       'API: $_base',
       'Build: ${kReleaseMode ? 'release' : 'debug/profile'}',
       'Platform: ${defaultTargetPlatform.name}',
+      'Installed version: ${_packageInfo?.version ?? 'Unavailable'}',
+      'Installed build: ${_packageInfo?.buildNumber ?? 'Unavailable'}',
+      'Distribution channel: ${p?.channel ?? AppUpdateService.channel}',
+      'Latest server version: ${p?.offline == false ? p?.latestVersion : 'Not verified online'}',
+      'Latest server build: ${p?.offline == false ? p?.latestBuild : 'Not verified online'}',
+      'Minimum supported build: ${p?.offline == false ? p?.minimumBuild : 'Not verified online'}',
+      'Version status: $_versionStatus',
       'Signed in: ${widget.authService.signedIn}',
       'Account ID: ${account?['account_id'] ?? 'unknown'}',
       'Checked: ${_checkedAt?.toIso8601String() ?? 'not run'}',
@@ -252,6 +303,62 @@ class _NdrlDiagnosticsScreenState extends State<NdrlDiagnosticsScreen> {
             _line('API host', Uri.parse(AppConfig.baseUrl).host),
             _line('Build mode', kReleaseMode ? 'Release' : 'Debug / Profile'),
             _line('Platform', defaultTargetPlatform.name),
+          ]),
+          _section('APP VERSION', [
+            _line('Installed version', _packageInfo?.version ?? 'Loading...'),
+            _line('Installed build', _packageInfo?.buildNumber ?? 'Loading...'),
+            _line(
+              'Distribution',
+              _versionPolicy?.channel ?? AppUpdateService.channel,
+            ),
+            _line(
+              'Latest server version',
+              _versionPolicy == null || _versionPolicy!.offline
+                  ? 'Not verified online'
+                  : _versionPolicy!.latestVersion,
+            ),
+            _line(
+              'Latest server build',
+              _versionPolicy == null || _versionPolicy!.offline
+                  ? 'Not verified online'
+                  : '${_versionPolicy!.latestBuild}',
+            ),
+            _line(
+              'Minimum supported build',
+              _versionPolicy == null || _versionPolicy!.offline
+                  ? 'Not verified online'
+                  : '${_versionPolicy!.minimumBuild}',
+            ),
+            _line('Update status', _versionStatus),
+            if (_versionPolicy?.offline == true)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  'Server unavailable. Cached or fallback policy shown; current server requirements are not verified.',
+                  style: TextStyle(color: Colors.orangeAccent),
+                ),
+              ),
+            if (_versionError != null)
+              Text(
+                _versionError!,
+                style: const TextStyle(color: Colors.orangeAccent),
+              ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _checkingVersion ? null : _refreshVersion,
+              icon: _checkingVersion
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              label: Text(
+                _checkingVersion
+                    ? 'Checking version...'
+                    : 'Refresh version status',
+              ),
+            ),
           ]),
           _section('ACCOUNT', [
             _line(
