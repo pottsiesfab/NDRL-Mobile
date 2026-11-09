@@ -1,24 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ndrl/screens/app_shell.dart';
+import 'package:ndrl/services/auth_service.dart';
+import 'package:ndrl/services/device_service.dart';
 
 void main() {
   testWidgets('NDRL app displays home dashboard', (tester) async {
+    final deviceService = DeviceService();
+    final authService = AuthService(deviceService: deviceService);
+
+    addTearDown(() {
+      authService.dispose();
+      deviceService.dispose();
+    });
+
     await tester.pumpWidget(
-      const MaterialApp(themeMode: ThemeMode.dark, home: NdrlAppShell()),
+      MaterialApp(
+        themeMode: ThemeMode.dark,
+        home: NdrlAppShell(authService: authService),
+      ),
     );
 
     expect(find.text('NDRL MOBILE'), findsOneWidget);
     expect(find.text('Live Staging Board'), findsOneWidget);
     expect(find.text('Season Points'), findsOneWidget);
     expect(find.text('Fantasy Racing'), findsOneWidget);
-    expect(find.text('Driver Profiles'), findsOneWidget);
+    expect(find.text('NDRL Members'), findsOneWidget);
     expect(find.text('Our Sponsors'), findsOneWidget);
   });
 
   testWidgets('NDRL bottom navigation works', (tester) async {
+    final deviceService = DeviceService();
+    final authService = AuthService(deviceService: deviceService);
+
+    addTearDown(() {
+      authService.dispose();
+      deviceService.dispose();
+    });
+
     await tester.pumpWidget(
-      const MaterialApp(themeMode: ThemeMode.dark, home: NdrlAppShell()),
+      MaterialApp(
+        themeMode: ThemeMode.dark,
+        home: NdrlAppShell(authService: authService),
+      ),
     );
 
     // Navigate to Staging.
