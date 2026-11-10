@@ -44,7 +44,9 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   }
 
   late final WidgetsBindingObserver _officialsLifecycle = _OfficialLifecycle(
-    onResume: () { if (mounted) _officials.refresh(); },
+    onResume: () {
+      if (mounted) _officials.refresh();
+    },
   );
 
   @override
@@ -55,11 +57,12 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   }
 
   void _openOfficials() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => NdrlOfficialsDashboardScreen(officials: _officials),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NdrlOfficialsDashboardScreen(officials: _officials),
+      ),
+    );
   }
-
 
   static const _destinations = [
     NavigationDestination(
@@ -458,59 +461,89 @@ class _MoreScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const entries = [
-      ('My Account', Icons.account_circle_outlined),
-      ('Our Sponsors', Icons.handshake_outlined),
-      ('Season Points', Icons.emoji_events_outlined),
-      ('Fantasy Racing', Icons.sports_score),
-      ('NDRL Members', Icons.people_outline),
-      ('Notification Settings', Icons.settings_outlined),
-      ('Diagnostics', Icons.monitor_heart_outlined),
-      ('About NDRL', Icons.info_outline),
-      ('Contact Us', Icons.contact_phone_outlined),
-      ('NDRL News', Icons.newspaper_outlined),
-      ('NDRL Rules', Icons.menu_book_outlined),
-    ];
-
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
       children: [
-        const Text(
-          'MORE NDRL',
-          style: TextStyle(
-            color: ndrlGold,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
+        const _MoreSectionHeading('MY NDRL'),
+        _MoreLinkCard(
+          title: 'My Account',
+          description: 'Profile, membership and account details',
+          icon: Icons.account_circle_outlined,
+          onTap: onOpenAccount,
         ),
-        const SizedBox(height: 16),
         if (officials.access.enabled)
-          Card(color: ndrlSurface, child: ListTile(
-            leading: const Icon(Icons.shield_outlined, color: ndrlGold),
-            title: const Text('Officials / Race Control'),
-            trailing: const Icon(Icons.chevron_right),
+          _MoreLinkCard(
+            title: 'Officials / Race Control',
+            description: 'Race management and official tools',
+            icon: Icons.shield_outlined,
             onTap: onOpenOfficials,
-          )),
-        for (final entry in entries)
-          Card(
-            color: ndrlSurface,
-            child: ListTile(
-              leading: Icon(entry.$2, color: ndrlGold),
-              title: Text(entry.$1),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                if (entry.$1 == 'My Account') {
-                  onOpenAccount();
-                } else if (entry.$1 == 'Diagnostics') {
-                  onOpenDiagnostics();
-                } else if (entry.$1 == 'Notification Settings') {
-                  onOpenNotificationSettings();
-                } else {
-                  onOpenFeature(entry.$1);
-                }
-              },
-            ),
           ),
+        _MoreLinkCard(
+          title: 'Notification Settings',
+          description: 'Manage race alerts and subscriptions',
+          icon: Icons.settings_outlined,
+          onTap: onOpenNotificationSettings,
+        ),
+        const SizedBox(height: 24),
+        const _MoreSectionHeading('RACING & COMMUNITY'),
+        _MoreLinkCard(
+          title: 'Season Points',
+          description: 'Championship standings and rankings',
+          icon: Icons.emoji_events_outlined,
+          onTap: () => onOpenFeature('Season Points'),
+        ),
+        _MoreLinkCard(
+          title: 'Fantasy Racing',
+          description: 'Build rosters and follow your fantasy team',
+          icon: Icons.sports_score,
+          onTap: () => onOpenFeature('Fantasy Racing'),
+        ),
+        _MoreLinkCard(
+          title: 'NDRL Members',
+          description: 'Member directory and driver profiles',
+          icon: Icons.people_outline,
+          onTap: () => onOpenFeature('NDRL Members'),
+        ),
+        _MoreLinkCard(
+          title: 'Our Sponsors',
+          description: 'Support the partners behind NDRL',
+          icon: Icons.handshake_outlined,
+          onTap: () => onOpenFeature('Our Sponsors'),
+        ),
+        const SizedBox(height: 24),
+        const _MoreSectionHeading('NDRL INFORMATION'),
+        _MoreLinkCard(
+          title: 'NDRL News',
+          description: 'Announcements and league updates',
+          icon: Icons.newspaper_outlined,
+          onTap: () => onOpenFeature('NDRL News'),
+        ),
+        _MoreLinkCard(
+          title: 'NDRL Rules',
+          description: 'Class regulations and competition rules',
+          icon: Icons.menu_book_outlined,
+          onTap: () => onOpenFeature('NDRL Rules'),
+        ),
+        _MoreLinkCard(
+          title: 'About NDRL',
+          description: 'Learn about the league',
+          icon: Icons.info_outline,
+          onTap: () => onOpenFeature('About NDRL'),
+        ),
+        _MoreLinkCard(
+          title: 'Contact Us',
+          description: 'Get in touch with NDRL',
+          icon: Icons.contact_phone_outlined,
+          onTap: () => onOpenFeature('Contact Us'),
+        ),
+        const SizedBox(height: 24),
+        const _MoreSectionHeading('APP & SUPPORT'),
+        _MoreLinkCard(
+          title: 'Diagnostics',
+          description: 'Device, connectivity and notification status',
+          icon: Icons.monitor_heart_outlined,
+          onTap: onOpenDiagnostics,
+        ),
         const SizedBox(height: 24),
         const NdrlSponsorAdWidget(
           placement: 'home_featured',
@@ -518,6 +551,98 @@ class _MoreScreen extends StatelessWidget {
           heading: 'FEATURED NDRL PARTNER',
         ),
       ],
+    );
+  }
+}
+
+class _MoreSectionHeading extends StatelessWidget {
+  const _MoreSectionHeading(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: ndrlGold,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.3,
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreLinkCard extends StatelessWidget {
+  const _MoreLinkCard({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final String description;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: const Color(0xFF111626),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(17),
+          side: const BorderSide(color: Color(0xFF303647)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+            child: Row(
+              children: [
+                Icon(icon, color: ndrlGold, size: 30),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          color: Color(0xFF969CAA),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFF9299A8),
+                  size: 28,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
