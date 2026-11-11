@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import 'device_service.dart';
 
@@ -276,6 +277,51 @@ class AuthService extends ChangeNotifier {
       throw const AuthException('Invalid server response');
     } catch (_) {
       throw const AuthException('Unable to connect to NDRL DEV');
+    }
+  }
+
+  /// Authenticated multipart upload; retries only when the server explicitly
+  /// returns 401. Never retry an uncertain network failure automatically.
+  Future<Map<String, dynamic>> authorizedMultipart(
+    Uri uri, {
+    required Map<String, String> fields,
+    required XFile file,
+  }) async {
+    if (_access == null) {
+      if (_refresh == null) throw const AuthException('Please sign in');
+      await refresh();
+    }
+    Future<http.Response> send() async {
+      final request = http.MultipartRequest('POST', uri);
+      request.headers['Accept'] = 'application/json';
+      request.headers['Authorization'] = 'Bearer $_access';
+      request.fields.addAll(fields);
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+      final streamed = await _http.send(request).timeout(const Duration(seconds: 60));
+      return http.Response.fromStream(streamed);
+    }
+    try {
+      var response = await send();
+      if (response.statusCode == 401) {
+        await refresh();
+        response = await send();
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const AuthException('Unexpected upload response');
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300 || decoded['success'] != true) {
+        throw AuthException(decoded['error']?.toString() ?? 'Upload failed (HTTP ${response.statusCode})');
+      }
+      return decoded;
+    } on AuthException {
+      rethrow;
+    } on TimeoutException {
+      throw const AuthException('Upload timed out; check the image before retrying');
+    } on FormatException {
+      throw const AuthException('Invalid upload response');
+    } catch (_) {
+      throw const AuthException('Unable to upload image; check connection');
     }
   }
 

@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../services/bounty_service.dart';
 import 'bounty_detail_screen.dart';
+import 'bounty_submit_screen.dart';
+import '../services/auth_service.dart';
 
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
 const _surface = Color(0xFF111626);
 
 class NdrlBountyBoardScreen extends StatefulWidget {
-  const NdrlBountyBoardScreen({super.key});
+  const NdrlBountyBoardScreen({super.key, required this.authService});
+  final AuthService authService;
   @override
   State<NdrlBountyBoardScreen> createState() => _NdrlBountyBoardScreenState();
 }
@@ -65,6 +68,19 @@ class _NdrlBountyBoardScreenState extends State<NdrlBountyBoardScreen> {
         title: const Text('BOUNTY BOARD'),
         backgroundColor: const Color(0xFF111111),
         actions: [
+          if (board != null)
+            IconButton(
+              tooltip: 'Submit bounty',
+              icon: const Icon(Icons.add_circle_outline, color: _gold),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => NdrlBountySubmitScreen(
+                    authService: widget.authService,
+                    event: board.event,
+                  ),
+                ),
+              ),
+            ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: _loading ? null : _refresh,

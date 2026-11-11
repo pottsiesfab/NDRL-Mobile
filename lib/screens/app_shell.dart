@@ -97,7 +97,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => title == 'Bounty Board'
-            ? const NdrlBountyBoardScreen()
+            ? NdrlBountyBoardScreen(authService: widget.authService)
             : title == 'Contact Us'
             ? const NdrlAboutScreen(contactsOnly: true)
             : title == 'NDRL Rules'
