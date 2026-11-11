@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/bounty_service.dart';
+import 'bounty_detail_screen.dart';
 
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
@@ -171,95 +172,81 @@ class _BountyCard extends StatelessWidget {
       color: _surface,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (claimed)
-            Container(
-              width: double.infinity,
-              color: const Color(0xFF302817),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-              child: const Row(
-                children: [
-                  Icon(Icons.emoji_events, color: _gold, size: 20),
-                  SizedBox(width: 9),
-                  Text(
-                    'BOUNTY COLLECTED',
-                    style: TextStyle(
-                      color: _gold,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          _BountyImage(
-            url: claimed ? bounty.claimPhoto ?? bounty.artwork : bounty.artwork,
-            height: 180,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => NdrlBountyDetailScreen(bounty: bounty),
           ),
-          if (showingClaimPhoto)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 7, 16, 0),
-              child: Text(
-                'CLAIM PHOTO',
-                style: TextStyle(
-                  color: Colors.white60,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.1,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (claimed)
+              Container(
+                width: double.infinity,
+                color: const Color(0xFF302817),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 11,
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.emoji_events, color: _gold, size: 20),
+                    SizedBox(width: 9),
+                    Text(
+                      'BOUNTY COLLECTED',
+                      style: TextStyle(
+                        color: _gold,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            _BountyImage(
+              url: claimed
+                  ? bounty.claimPhoto ?? bounty.artwork
+                  : bounty.artwork,
+              height: 180,
             ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  bounty.title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  bounty.amount,
-                  style: const TextStyle(
-                    color: _gold,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'TARGET RACER',
+            if (showingClaimPhoto)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 7, 16, 0),
+                child: Text(
+                  'CLAIM PHOTO',
                   style: TextStyle(
-                    color: _gold,
+                    color: Colors.white60,
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 1.1,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${bounty.targetName} · ${bounty.className}${bounty.carNumber.isEmpty ? '' : ' · #${bounty.carNumber}'}',
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                if (bounty.description.isNotEmpty) ...[
-                  const SizedBox(height: 10),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    bounty.description,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                    bounty.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ],
-                const SizedBox(height: 14),
-                if (claimed) ...[
-                  const Divider(color: Color(0xFF303647), height: 18),
+                  const SizedBox(height: 8),
+                  Text(
+                    bounty.amount,
+                    style: const TextStyle(
+                      color: _gold,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   const Text(
-                    'BOUNTY CLAIMED BY',
+                    'TARGET RACER',
                     style: TextStyle(
                       color: _gold,
                       fontSize: 11,
@@ -267,50 +254,79 @@ class _BountyCard extends StatelessWidget {
                       letterSpacing: 1.1,
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    bounty.claimedBy,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                   const SizedBox(height: 4),
                   Text(
-                    'Elimination round: ${bounty.round}',
+                    '${bounty.targetName} · ${bounty.className}${bounty.carNumber.isEmpty ? '' : ' · #${bounty.carNumber}'}',
                     style: const TextStyle(color: Colors.white70),
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 6,
+                  if (bounty.description.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      bounty.description,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF242428),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF4C5260)),
-                    ),
-                    child: Text(
-                      'PAYMENT: ${bounty.paymentStatus.toUpperCase()}',
-                      style: const TextStyle(
+                  ],
+                  const SizedBox(height: 14),
+                  if (claimed) ...[
+                    const Divider(color: Color(0xFF303647), height: 18),
+                    const Text(
+                      'BOUNTY CLAIMED BY',
+                      style: TextStyle(
                         color: _gold,
-                        fontWeight: FontWeight.w800,
                         fontSize: 11,
-                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
                       ),
                     ),
-                  ),
-                ] else
-                  const Text(
-                    'ACTIVE · UNCLAIMED',
-                    style: TextStyle(color: _gold, fontWeight: FontWeight.bold),
-                  ),
-              ],
+                    const SizedBox(height: 5),
+                    Text(
+                      bounty.claimedBy,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Elimination round: ${bounty.round}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF242428),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF4C5260)),
+                      ),
+                      child: Text(
+                        'PAYMENT: ${bounty.paymentStatus.toUpperCase()}',
+                        style: const TextStyle(
+                          color: _gold,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                  ] else
+                    const Text(
+                      'ACTIVE · UNCLAIMED',
+                      style: TextStyle(
+                        color: _gold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
