@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/bounty_service.dart';
 import 'bounty_detail_screen.dart';
 import 'bounty_submit_screen.dart';
+import 'my_bounties_screen.dart';
 import '../services/auth_service.dart';
 
 const _gold = Color(0xFFD1AC67);
@@ -68,6 +69,16 @@ class _NdrlBountyBoardScreenState extends State<NdrlBountyBoardScreen> {
         title: const Text('BOUNTY BOARD'),
         backgroundColor: const Color(0xFF111111),
         actions: [
+          IconButton(
+            tooltip: 'My Bounties',
+            icon: const Icon(Icons.assignment_outlined, color: _gold),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    NdrlMyBountiesScreen(authService: widget.authService),
+              ),
+            ),
+          ),
           if (board != null)
             IconButton(
               tooltip: 'Submit bounty',
