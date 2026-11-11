@@ -17,6 +17,7 @@ import 'news_screen.dart';
 import 'rules_screen.dart';
 import '../services/official_access_service.dart';
 import 'officials_dashboard_screen.dart';
+import 'bounty_board_screen.dart';
 
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
@@ -95,7 +96,9 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   void _openFeature(String title) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => title == 'Contact Us'
+        builder: (_) => title == 'Bounty Board'
+            ? const NdrlBountyBoardScreen()
+            : title == 'Contact Us'
             ? const NdrlAboutScreen(contactsOnly: true)
             : title == 'NDRL Rules'
             ? const NdrlRulesScreen()
@@ -497,6 +500,12 @@ class _MoreScreen extends StatelessWidget {
           description: 'Build rosters and follow your fantasy team',
           icon: Icons.sports_score,
           onTap: () => onOpenFeature('Fantasy Racing'),
+        ),
+        _MoreLinkCard(
+          title: 'Bounty Board',
+          description: 'See who is wanted and who collected',
+          icon: Icons.gps_fixed,
+          onTap: () => onOpenFeature('Bounty Board'),
         ),
         _MoreLinkCard(
           title: 'NDRL Members',
