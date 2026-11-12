@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/tech_cards_service.dart';
 import '../widgets/sponsor_ad_widget.dart';
 import 'account_screen.dart';
+import 'tech_card_details_screen.dart';
 
 const _background = Color(0xFF111111);
 const _surface = Color(0xFF111626);
@@ -119,7 +120,7 @@ class _NdrlMyTechCardsScreenState extends State<NdrlMyTechCardsScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Review your NDRL Tech Card status. Editing will be added in the next phase.',
+              'Select an existing Tech Card to view or edit vehicle basics.',
               style: TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 20),
@@ -169,54 +170,72 @@ class _NdrlMyTechCardsScreenState extends State<NdrlMyTechCardsScreen> {
                 Card(
                   color: _surface,
                   margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          vehicle.className,
-                          style: const TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        Text(
-                          '${vehicle.seasonName}${vehicle.carNumber.isEmpty ? '' : '  ·  Car #${vehicle.carNumber}'}',
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(
-                              vehicle.hasCard
-                                  ? Icons.assignment_outlined
-                                  : Icons.info_outline,
-                              size: 18,
-                              color: _gold,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                vehicle.hasCard
-                                    ? 'Tech Card: ${vehicle.status}'
-                                    : 'No Tech Card on file',
-                                style: const TextStyle(
-                                  color: _gold,
-                                  fontWeight: FontWeight.w600,
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: !vehicle.hasCard || vehicle.vehicleId <= 0
+                        ? null
+                        : () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => NdrlTechCardDetailsScreen(
+                                  authService: widget.authService,
+                                  vehicle: vehicle,
                                 ),
                               ),
+                            );
+                            if (mounted) _refresh();
+                          },
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            vehicle.className,
+                            style: const TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.bold,
                             ),
-                            if (vehicle.isLocked)
-                              const Icon(
-                                Icons.lock_outline,
-                                color: _gold,
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            '${vehicle.seasonName}${vehicle.carNumber.isEmpty ? '' : '  ·  Car #${vehicle.carNumber}'}',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(
+                                vehicle.hasCard
+                                    ? Icons.assignment_outlined
+                                    : Icons.info_outline,
                                 size: 18,
+                                color: _gold,
                               ),
-                          ],
-                        ),
-                      ],
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  vehicle.hasCard
+                                      ? 'Tech Card: ${vehicle.status}'
+                                      : 'No Tech Card on file',
+                                  style: const TextStyle(
+                                    color: _gold,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              if (vehicle.isLocked)
+                                const Icon(
+                                  Icons.lock_outline,
+                                  color: _gold,
+                                  size: 18,
+                                ),
+                              if (vehicle.hasCard)
+                                const Icon(Icons.chevron_right, color: _gold),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

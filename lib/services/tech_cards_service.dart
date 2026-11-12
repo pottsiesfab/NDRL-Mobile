@@ -48,4 +48,28 @@ class TechCardsService {
 
   Future<List<TechCardRecord>> vehicles() => _list('vehicles');
   Future<List<TechCardRecord>> mine() => _list('mine');
+
+  Future<Map<String, dynamic>> card(int vehicleId) async {
+    final response = await auth.authorizedGet(
+      AppConfig.apiUri(
+        '/mobile/api/mobile_tech_api.php',
+        queryParameters: {
+          'action': 'card',
+          'member_season_class_id': '$vehicleId',
+        },
+      ),
+    );
+    final data = response['data'];
+    if (data is! Map || data['tech_card'] is! Map) {
+      throw const FormatException('Invalid Tech Card detail response');
+    }
+    return Map<String, dynamic>.from(data['tech_card'] as Map);
+  }
+
+  Future<void> saveBasics(int vehicleId, Map<String, dynamic> basics) async {
+    await auth.authorizedPost(_uri('save_basics'), {
+      'member_season_class_id': vehicleId,
+      ...basics,
+    });
+  }
 }
