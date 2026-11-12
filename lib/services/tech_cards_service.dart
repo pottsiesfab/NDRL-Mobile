@@ -66,10 +66,72 @@ class TechCardsService {
     return Map<String, dynamic>.from(data['tech_card'] as Map);
   }
 
+  Future<List<TechModification>> cardModifications(int vehicleId) async {
+    final response = await auth.authorizedGet(
+      AppConfig.apiUri(
+        '/mobile/api/mobile_tech_api.php',
+        queryParameters: {
+          'action': 'card_mods',
+          'member_season_class_id': '$vehicleId',
+        },
+      ),
+    );
+    final data = response['data'];
+    if (data is! Map || data['rows'] is! List) {
+      throw const FormatException('Invalid modifications response');
+    }
+    return (data['rows'] as List).map((row) {
+      if (row is! Map) throw const FormatException('Invalid modification row');
+      final mod = TechModification(Map<String, dynamic>.from(row));
+      if (mod.id <= 0 || !row.containsKey('member_answered')) {
+        throw const FormatException('Modification ID or answer state missing');
+      }
+      return mod;
+    }).toList();
+  }
+
+  Future<void> saveModificationDraft(
+    int vehicleId,
+    List<Map<String, dynamic>> answers,
+  ) async {
+    await auth.authorizedPost(_uri('save_mods'), {
+      'member_season_class_id': vehicleId,
+      'save_draft': true,
+      'mod_answers': answers,
+    });
+  }
+
+  Future<void> completeModifications(
+    int vehicleId,
+    List<int> selectedIds,
+  ) async {
+    await auth.authorizedPost(_uri('save_mods'), {
+      'member_season_class_id': vehicleId,
+      'save_draft': false,
+      'selected_mod_ids': selectedIds,
+    });
+  }
+
   Future<void> saveBasics(int vehicleId, Map<String, dynamic> basics) async {
     await auth.authorizedPost(_uri('save_basics'), {
       'member_season_class_id': vehicleId,
       ...basics,
     });
+  }
+}
+
+class TechModification {
+  const TechModification(this.data);
+  final Map<String, dynamic> data;
+  int get id => int.tryParse('${data['tech_mod_def_id'] ?? ''}') ?? 0;
+  String get label => '${data['label'] ?? data['code'] ?? 'Modification'}';
+  String get description => '${data['description'] ?? ''}'.trim();
+  String get group => '${data['ui_group'] ?? ''}'.trim();
+  String get mode => '${data['ui_mode'] ?? ''}'.trim().toLowerCase();
+  bool get required => '${data['ui_required'] ?? 0}' == '1';
+  bool get inspectorChecked => '${data['inspector_checked'] ?? 0}' == '1';
+  bool? get answer {
+    if ('${data['member_answered'] ?? 0}' != '1') return null;
+    return '${data['member_checked'] ?? 0}' == '1';
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/tech_cards_service.dart';
 import '../widgets/sponsor_ad_widget.dart';
+import 'tech_card_modifications_screen.dart';
 
 const _bg = Color(0xFF111111);
 const _gold = Color(0xFFD1AC67);
@@ -355,6 +356,31 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
                   ],
                 ),
               ),
+            ],
+            if (!_loading && card != null) ...[
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: _saving || _dirty
+                    ? null
+                    : () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => NdrlTechCardModificationsScreen(
+                              authService: widget.authService,
+                              vehicleId: widget.vehicle.vehicleId,
+                            ),
+                          ),
+                        );
+                        if (mounted) _load();
+                      },
+                icon: const Icon(Icons.tune),
+                label: const Text('Vehicle modifications'),
+              ),
+              if (_dirty)
+                const Text(
+                  'Save or discard vehicle basics changes before opening modifications.',
+                  style: TextStyle(color: Colors.white70),
+                ),
             ],
             const SizedBox(height: 26),
             const NdrlSponsorAdWidget(
