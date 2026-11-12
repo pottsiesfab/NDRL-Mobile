@@ -18,6 +18,7 @@ import 'rules_screen.dart';
 import '../services/official_access_service.dart';
 import 'officials_dashboard_screen.dart';
 import 'bounty_board_screen.dart';
+import 'my_tech_cards_screen.dart';
 
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
@@ -96,7 +97,9 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   void _openFeature(String title) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => title == 'Bounty Board'
+        builder: (_) => title == 'My Tech Cards'
+            ? NdrlMyTechCardsScreen(authService: widget.authService)
+            : title == 'Bounty Board'
             ? NdrlBountyBoardScreen(authService: widget.authService)
             : title == 'Contact Us'
             ? const NdrlAboutScreen(contactsOnly: true)
@@ -473,6 +476,12 @@ class _MoreScreen extends StatelessWidget {
           description: 'Profile, membership and account details',
           icon: Icons.account_circle_outlined,
           onTap: onOpenAccount,
+        ),
+        _MoreLinkCard(
+          title: 'My Tech Cards',
+          description: 'View your vehicles and inspection cards',
+          icon: Icons.fact_check_outlined,
+          onTap: () => onOpenFeature('My Tech Cards'),
         ),
         if (officials.access.enabled)
           _MoreLinkCard(
