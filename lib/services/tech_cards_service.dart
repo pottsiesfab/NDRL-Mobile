@@ -112,6 +112,70 @@ class TechCardsService {
     });
   }
 
+  Future<Map<String, dynamic>> equipmentRequirements(int vehicleId) async {
+    final response = await auth.authorizedGet(
+      AppConfig.apiUri(
+        '/mobile/api/mobile_tech_api.php',
+        queryParameters: {
+          'action': 'equipment_requirements',
+          'member_season_class_id': '$vehicleId',
+        },
+      ),
+    );
+    final data = response['data'];
+    if (data is! Map || data['items'] is! List) {
+      throw const FormatException('Invalid equipment requirements response');
+    }
+    return Map<String, dynamic>.from(data);
+  }
+
+  Future<Map<int, Map<String, dynamic>>> cardEquipment(int vehicleId) async {
+    final response = await auth.authorizedGet(
+      AppConfig.apiUri(
+        '/mobile/api/mobile_tech_api.php',
+        queryParameters: {
+          'action': 'card_equipment',
+          'member_season_class_id': '$vehicleId',
+        },
+      ),
+    );
+    final data = response['data'];
+    if (data is! Map || data['items_by_def_id'] is! Map) {
+      throw const FormatException('Invalid saved equipment response');
+    }
+    final result = <int, Map<String, dynamic>>{};
+    for (final entry in (data['items_by_def_id'] as Map).entries) {
+      final id = int.tryParse('${entry.key}');
+      if (id == null || entry.value is! Map) continue;
+      result[id] = Map<String, dynamic>.from(entry.value as Map);
+    }
+    return result;
+  }
+
+  Future<void> saveEquipment(
+    int vehicleId,
+    int definitionId,
+    Map<String, dynamic> fields,
+  ) async {
+    await auth.authorizedPost(_uri('save_equipment'), {
+      'member_season_class_id': vehicleId,
+      'tech_item_def_id': definitionId,
+      ...fields,
+    });
+  }
+
+  Future<void> acceptCard(int vehicleId) async {
+    await auth.authorizedPost(_uri('accept_card'), {
+      'member_season_class_id': vehicleId,
+    });
+  }
+
+  Future<void> submitCard(int vehicleId) async {
+    await auth.authorizedPost(_uri('submit_card'), {
+      'member_season_class_id': vehicleId,
+    });
+  }
+
   Future<void> saveBasics(int vehicleId, Map<String, dynamic> basics) async {
     await auth.authorizedPost(_uri('save_basics'), {
       'member_season_class_id': vehicleId,
