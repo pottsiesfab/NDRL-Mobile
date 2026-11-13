@@ -5,6 +5,7 @@ import '../services/tech_cards_service.dart';
 import '../widgets/sponsor_ad_widget.dart';
 import 'tech_card_equipment_screen.dart';
 import 'tech_card_modifications_screen.dart';
+import '../widgets/tech_card_step_nav.dart';
 
 const _bg = Color(0xFF111111);
 const _gold = Color(0xFFD1AC67);
@@ -221,6 +222,16 @@ class _NdrlTechCardReviewScreenState extends State<NdrlTechCardReviewScreen> {
             '${widget.vehicle.seasonName} · Car #${widget.vehicle.carNumber}',
             style: const TextStyle(color: Colors.white70),
           ),
+          if (!_loading && card != null) ...[
+            const SizedBox(height: 14),
+            TechCardStepNav(
+              current: TechCardStep.review,
+              card: card,
+              modifications: _mods,
+              busy: _busy,
+              onSelected: (step) => Navigator.of(context).pop(step),
+            ),
+          ],
           if (_loading || _busy)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),

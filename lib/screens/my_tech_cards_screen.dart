@@ -5,6 +5,7 @@ import '../services/tech_cards_service.dart';
 import '../widgets/sponsor_ad_widget.dart';
 import 'account_screen.dart';
 import 'tech_card_details_screen.dart';
+import 'tech_card_reference_screen.dart';
 
 const _background = Color(0xFF111111);
 const _surface = Color(0xFF111626);
@@ -120,7 +121,7 @@ class _NdrlMyTechCardsScreenState extends State<NdrlMyTechCardsScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Select an existing Tech Card to view or edit vehicle basics.',
+              'Select a vehicle to create, view, or edit its Tech Card.',
               style: TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 20),
@@ -172,7 +173,7 @@ class _NdrlMyTechCardsScreenState extends State<NdrlMyTechCardsScreen> {
                   margin: const EdgeInsets.only(bottom: 12),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
-                    onTap: !vehicle.hasCard || vehicle.vehicleId <= 0
+                    onTap: vehicle.vehicleId <= 0
                         ? null
                         : () async {
                             await Navigator.of(context).push(
@@ -234,6 +235,41 @@ class _NdrlMyTechCardsScreenState extends State<NdrlMyTechCardsScreen> {
                                 const Icon(Icons.chevron_right, color: _gold),
                             ],
                           ),
+                          if (!vehicle.hasCard && vehicle.vehicleId > 0) ...[
+                            const SizedBox(height: 14),
+                            FilledButton.icon(
+                              onPressed: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => NdrlTechCardDetailsScreen(
+                                      authService: widget.authService,
+                                      vehicle: vehicle,
+                                    ),
+                                  ),
+                                );
+                                if (mounted) _refresh();
+                              },
+                              icon: const Icon(Icons.add_circle_outline),
+                              label: const Text('Create Tech Card'),
+                            ),
+                          ],
+                          if (vehicle.hasCard && vehicle.vehicleId > 0) ...[
+                            const SizedBox(height: 14),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => NdrlTechCardReferenceScreen(
+                                      authService: widget.authService,
+                                      vehicle: vehicle,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.content_copy_outlined),
+                              label: const Text('View / Copy Tech Card'),
+                            ),
+                          ],
                         ],
                       ),
                     ),

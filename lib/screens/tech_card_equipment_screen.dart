@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/tech_cards_service.dart';
 import '../widgets/sponsor_ad_widget.dart';
+import '../widgets/tech_card_step_nav.dart';
 
 const _bg = Color(0xFF111111);
 const _gold = Color(0xFFD1AC67);
@@ -32,6 +33,10 @@ class _NdrlTechCardEquipmentScreenState
   bool _loading = true;
   bool _editing = false;
   bool _locked = true;
+  Map<String, dynamic>? _card;
+  List<TechModification>? _mods;
+  // Keep categories open across item saves and data refreshes.
+  final Set<String> _expandedCategories = <String>{};
 
   @override
   void initState() {
@@ -50,9 +55,12 @@ class _NdrlTechCardEquipmentScreenState
       );
       final saved = await _service.cardEquipment(widget.vehicleId);
       final card = await _service.card(widget.vehicleId);
+      final mods = await _service.cardModifications(widget.vehicleId);
       final status = '${card['status'] ?? ''}'.toLowerCase();
       if (!mounted) return;
       setState(() {
+        _card = card;
+        _mods = mods;
         _requirements = requirements;
         _saved = saved;
         _locked =
@@ -296,6 +304,16 @@ class _NdrlTechCardEquipmentScreenState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (!_loading && _card != null) ...[
+            TechCardStepNav(
+              current: TechCardStep.equipment,
+              card: _card,
+              modifications: _mods,
+              busy: _editing,
+              onSelected: (step) => Navigator.of(context).pop(step),
+            ),
+            const SizedBox(height: 18),
+          ],
           const Text(
             'REQUIRED EQUIPMENT',
             style: TextStyle(
@@ -332,83 +350,138 @@ class _NdrlTechCardEquipmentScreenState
             ),
             const SizedBox(height: 18),
             for (final category in categories)
-              Card(
-                color: const Color(0xFF111626),
-                child: ExpansionTile(
-                  title: Text(
-                    category,
-                    style: const TextStyle(
-                      color: _gold,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text('${groups[category]!.length} items'),
-                  children: [
-                    for (final item in groups[category]!)
-                      Builder(
-                        builder: (context) {
-                          final id = int.tryParse(
-                            '${item['tech_item_def_id']}',
-                          );
-                          final saved = id == null ? null : _saved[id];
-                          final complete =
-                              _flag(saved?['member_attested']) &&
-                              _flag(saved?['member_checked']);
-                          final fields = <String>[];
-                          if (_flag(item['show_brand'])) fields.add('Brand');
-                          if (_flag(item['requires_serial']))
-                            fields.add('Serial');
-                          if (_flag(item['requires_expiry']))
-                            fields.add('Expiration');
-                          if (_flag(item['requires_issuer']))
-                            fields.add('Issuer');
-                          if (_flag(item['requires_sfi'])) fields.add('SFI');
-                          final description = '${item['description'] ?? ''}'
-                              .trim();
-                          return ListTile(
-                            enabled: !_locked && !_editing,
-                            onTap: _locked || _editing
-                                ? null
-                                : () => _editItem(item),
-                            trailing: _locked
-                                ? const Icon(Icons.lock_outline, size: 18)
-                                : const Icon(Icons.edit_outlined, size: 18),
-                            leading: Icon(
-                              complete
-                                  ? Icons.check_circle
-                                  : Icons.radio_button_unchecked,
-                              color: complete
-                                  ? Colors.greenAccent
-                                  : Colors.white54,
+              Builder(
+                builder: (context) {
+                  final categoryItems = groups[category]!;
+                  final categoryAttested = categoryItems.where((item) {
+                    final id = int.tryParse('${item['tech_item_def_id']}');
+                    final saved = id == null ? null : _saved[id];
+                    return _flag(saved?['member_checked']) &&
+                        _flag(saved?['member_attested']);
+                  }).length;
+                  final categoryComplete =
+                      categoryItems.isNotEmpty &&
+                      categoryAttested == categoryItems.length;
+                  const completeColor = Color(0xFF80D6A0);
+                  return Card(
+                    color: categoryComplete
+                        ? const Color(0xFF142A22)
+                        : const Color(0xFF111626),
+                    child: ExpansionTile(
+                      key: ValueKey('equipment-category-$category'),
+                      initiallyExpanded: _expandedCategories.contains(category),
+                      onExpansionChanged: (expanded) {
+                        if (expanded) {
+                          _expandedCategories.add(category);
+                        } else {
+                          _expandedCategories.remove(category);
+                        }
+                      },
+                      iconColor: categoryComplete ? completeColor : _gold,
+                      collapsedIconColor: categoryComplete
+                          ? completeColor
+                          : Colors.white70,
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              category,
+                              style: TextStyle(
+                                color: categoryComplete ? completeColor : _gold,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                            title: Text(
-                              '${item['label'] ?? item['code'] ?? 'Equipment'}',
+                          ),
+                          if (categoryComplete)
+                            const Icon(
+                              Icons.check_circle,
+                              color: completeColor,
+                              size: 19,
                             ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (description.isNotEmpty) Text(description),
-                                if (fields.isNotEmpty)
-                                  Text(
-                                    'Fields: ${fields.join(', ')}',
-                                    style: const TextStyle(
-                                      color: Colors.white60,
-                                    ),
-                                  ),
-                                if (saved != null) ...[
-                                  if ('${saved['brand_name'] ?? ''}'.isNotEmpty)
-                                    Text('Brand: ${saved['brand_name']}'),
-                                  if ('${saved['notes'] ?? ''}'.isNotEmpty)
-                                    Text('Notes: ${saved['notes']}'),
-                                ],
-                              ],
-                            ),
-                            isThreeLine: true,
-                          );
-                        },
+                        ],
                       ),
-                  ],
-                ),
+                      subtitle: Text(
+                        categoryComplete
+                            ? '$categoryAttested of ${categoryItems.length} attested · Complete'
+                            : '$categoryAttested of ${categoryItems.length} attested · ${categoryItems.length - categoryAttested} remaining',
+                        style: TextStyle(
+                          color: categoryComplete
+                              ? completeColor
+                              : Colors.white70,
+                        ),
+                      ),
+                      children: [
+                        for (final item in groups[category]!)
+                          Builder(
+                            builder: (context) {
+                              final id = int.tryParse(
+                                '${item['tech_item_def_id']}',
+                              );
+                              final saved = id == null ? null : _saved[id];
+                              final complete =
+                                  _flag(saved?['member_attested']) &&
+                                  _flag(saved?['member_checked']);
+                              final fields = <String>[];
+                              if (_flag(item['show_brand']))
+                                fields.add('Brand');
+                              if (_flag(item['requires_serial']))
+                                fields.add('Serial');
+                              if (_flag(item['requires_expiry']))
+                                fields.add('Expiration');
+                              if (_flag(item['requires_issuer']))
+                                fields.add('Issuer');
+                              if (_flag(item['requires_sfi']))
+                                fields.add('SFI');
+                              final description = '${item['description'] ?? ''}'
+                                  .trim();
+                              return ListTile(
+                                enabled: !_locked && !_editing,
+                                onTap: _locked || _editing
+                                    ? null
+                                    : () => _editItem(item),
+                                trailing: _locked
+                                    ? const Icon(Icons.lock_outline, size: 18)
+                                    : const Icon(Icons.edit_outlined, size: 18),
+                                leading: Icon(
+                                  complete
+                                      ? Icons.check_circle
+                                      : Icons.radio_button_unchecked,
+                                  color: complete
+                                      ? Colors.greenAccent
+                                      : Colors.white54,
+                                ),
+                                title: Text(
+                                  '${item['label'] ?? item['code'] ?? 'Equipment'}',
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (description.isNotEmpty)
+                                      Text(description),
+                                    if (fields.isNotEmpty)
+                                      Text(
+                                        'Fields: ${fields.join(', ')}',
+                                        style: const TextStyle(
+                                          color: Colors.white60,
+                                        ),
+                                      ),
+                                    if (saved != null) ...[
+                                      if ('${saved['brand_name'] ?? ''}'
+                                          .isNotEmpty)
+                                        Text('Brand: ${saved['brand_name']}'),
+                                      if ('${saved['notes'] ?? ''}'.isNotEmpty)
+                                        Text('Notes: ${saved['notes']}'),
+                                    ],
+                                  ],
+                                ),
+                                isThreeLine: true,
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
           ],
           const SizedBox(height: 20),

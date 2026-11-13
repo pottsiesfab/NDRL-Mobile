@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/tech_cards_service.dart';
 import '../widgets/sponsor_ad_widget.dart';
+import '../widgets/tech_card_step_nav.dart';
 
 const _background = Color(0xFF111111);
 const _gold = Color(0xFFD1AC67);
@@ -33,6 +34,7 @@ class _NdrlTechCardModificationsScreenState
   bool _saving = false;
   bool _dirty = false;
   bool _locked = true;
+  Map<String, dynamic>? _card;
   String? _error;
 
   @override
@@ -53,6 +55,7 @@ class _NdrlTechCardModificationsScreenState
       if (!mounted) return;
       final status = '${card['status'] ?? ''}'.toLowerCase();
       setState(() {
+        _card = card;
         _locked =
             card['locked_at'] != null ||
             status == 'approved' ||
@@ -158,6 +161,7 @@ class _NdrlTechCardModificationsScreenState
       _saving = true;
       _error = null;
     });
+    var savedSuccessfully = false;
     try {
       if (draft) {
         final answers = _mods
@@ -183,12 +187,13 @@ class _NdrlTechCardModificationsScreenState
           ),
         ),
       );
-      await _load();
+      savedSuccessfully = true;
     } catch (error) {
       if (mounted) setState(() => _error = '$error');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+    if (savedSuccessfully && mounted) await _load();
   }
 
   Future<bool> _confirmDiscard() async {
@@ -245,6 +250,24 @@ class _NdrlTechCardModificationsScreenState
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (!_loading && _card != null) ...[
+              TechCardStepNav(
+                current: TechCardStep.mods,
+                card: _card,
+                modifications: _mods,
+                busy: _saving || _dirty,
+                onSelected: (step) => Navigator.of(context).pop(step),
+              ),
+              if (_dirty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8, bottom: 12),
+                  child: Text(
+                    'Save or discard changes before switching sections.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ),
+              const SizedBox(height: 18),
+            ],
             const Text(
               'MODIFICATIONS',
               style: TextStyle(

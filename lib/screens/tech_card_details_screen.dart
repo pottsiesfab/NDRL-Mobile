@@ -6,6 +6,7 @@ import '../widgets/sponsor_ad_widget.dart';
 import 'tech_card_modifications_screen.dart';
 import 'tech_card_equipment_screen.dart';
 import 'tech_card_review_screen.dart';
+import '../widgets/tech_card_step_nav.dart';
 
 const _bg = Color(0xFF111111);
 const _gold = Color(0xFFD1AC67);
@@ -31,9 +32,11 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fields = <String, TextEditingController>{};
   Map<String, dynamic>? _card;
+  List<TechModification>? _savedMods;
   bool _loading = true;
   bool _saving = false;
   bool _dirty = false;
+  late bool _creating = !widget.vehicle.hasCard;
   String? _error;
   String _distance = '1/4';
 
@@ -68,6 +71,9 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
 
   bool get _locked {
     final card = _card;
+    // A new registration has no Tech Card until its first successful save.
+    // Do not mistake that initial state for a locked/submitted card.
+    if (_creating) return false;
     if (card == null) return true;
     final status = '${card['status'] ?? ''}'.toLowerCase();
     return card['locked_at'] != null ||
@@ -76,19 +82,30 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
   }
 
   Future<void> _load() async {
-    if (_saving) return;
+    // An unsaved registration has no card yet: GET card would return 404.
+    if (_creating) {
+      setState(() {
+        _loading = false;
+        _error = null;
+        _card = null;
+        _savedMods = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final card = await _service.card(widget.vehicle.vehicleId);
+      final mods = await _service.cardModifications(widget.vehicle.vehicleId);
       if (!mounted) return;
       for (final name in _names) {
         _fields[name]!.text = card[name]?.toString() ?? '';
       }
       setState(() {
         _card = card;
+        _savedMods = mods;
         _distance = card['et_distance'] == '1/8' ? '1/8' : '1/4';
         _dirty = false;
       });
@@ -171,6 +188,8 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
         'horsepower': _optionalNumber('horsepower', integer: true),
       });
       if (!mounted) return;
+      // A successful first save creates the card; subsequent loads use GET card.
+      _creating = false;
       // Saving basics invalidates downstream modification and acceptance steps.
       setState(() => _dirty = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,6 +223,55 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
           ),
         ) ??
         false;
+  }
+
+  Future<void> _openStep(TechCardStep next) async {
+    if (_saving || _loading || _dirty) return;
+    while (mounted && next != TechCardStep.basics) {
+      final TechCardStep? destination;
+      switch (next) {
+        case TechCardStep.mods:
+          destination = await Navigator.of(context).push<TechCardStep>(
+            MaterialPageRoute(
+              builder: (_) => NdrlTechCardModificationsScreen(
+                authService: widget.authService,
+                vehicleId: widget.vehicle.vehicleId,
+              ),
+            ),
+          );
+        case TechCardStep.equipment:
+          destination = await Navigator.of(context).push<TechCardStep>(
+            MaterialPageRoute(
+              builder: (_) => NdrlTechCardEquipmentScreen(
+                authService: widget.authService,
+                vehicleId: widget.vehicle.vehicleId,
+              ),
+            ),
+          );
+        case TechCardStep.review:
+          destination = await Navigator.of(context).push<TechCardStep>(
+            MaterialPageRoute(
+              builder: (_) => NdrlTechCardReviewScreen(
+                authService: widget.authService,
+                vehicle: widget.vehicle,
+              ),
+            ),
+          );
+        case TechCardStep.basics:
+          return;
+      }
+      if (!mounted) return;
+      await _load();
+      if (!mounted || _error != null) return;
+      if (destination == null || destination == TechCardStep.basics) return;
+      // Re-check permissions after returning from a child page.
+      if (!TechCardStepNav.basicsComplete(_card) ||
+          (destination.index >= 2 &&
+              !TechCardStepNav.modsComplete(_savedMods) &&
+              !TechCardStepNav.isReadOnly(_card)))
+        return;
+      next = destination;
+    }
   }
 
   @override
@@ -254,20 +322,36 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
                 label: const Text('Retry / reload'),
               ),
             ],
-            if (!_loading && card != null) ...[
+            if (!_loading && _error == null && (card != null || _creating)) ...[
               Text(
-                'Status: ${card['status'] ?? 'Unknown'}',
+                'Status: ${_creating ? 'Not started' : card?['status'] ?? 'Unknown'}',
                 style: const TextStyle(
                   color: _gold,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              if (_locked)
+              if (!_creating && _locked)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Text(
                     'This card is locked or approved. Details are read-only.',
                     style: TextStyle(color: _gold),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              TechCardStepNav(
+                current: TechCardStep.basics,
+                card: _creating ? null : _card,
+                modifications: _savedMods,
+                busy: _saving || _loading || _dirty,
+                onSelected: (step) => _openStep(step),
+              ),
+              if (_dirty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Save or discard vehicle basics changes before switching sections.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ),
               const SizedBox(height: 20),
@@ -358,67 +442,6 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
                   ],
                 ),
               ),
-            ],
-            if (!_loading && card != null) ...[
-              const SizedBox(height: 18),
-              OutlinedButton.icon(
-                onPressed: _saving || _dirty
-                    ? null
-                    : () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => NdrlTechCardModificationsScreen(
-                              authService: widget.authService,
-                              vehicleId: widget.vehicle.vehicleId,
-                            ),
-                          ),
-                        );
-                        if (mounted) _load();
-                      },
-                icon: const Icon(Icons.tune),
-                label: const Text('Vehicle modifications'),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: _saving || _dirty
-                    ? null
-                    : () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => NdrlTechCardEquipmentScreen(
-                              authService: widget.authService,
-                              vehicleId: widget.vehicle.vehicleId,
-                            ),
-                          ),
-                        );
-                        if (mounted) _load();
-                      },
-                icon: const Icon(Icons.fact_check_outlined),
-                label: const Text('Equipment checklist'),
-              ),
-              const SizedBox(height: 10),
-              FilledButton.icon(
-                onPressed: _saving || _dirty
-                    ? null
-                    : () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => NdrlTechCardReviewScreen(
-                              authService: widget.authService,
-                              vehicle: widget.vehicle,
-                            ),
-                          ),
-                        );
-                        if (mounted) _load();
-                      },
-                icon: const Icon(Icons.assignment_turned_in_outlined),
-                label: const Text('Review / Accept / Submit'),
-              ),
-              if (_dirty)
-                const Text(
-                  'Save or discard vehicle basics changes before opening modifications.',
-                  style: TextStyle(color: Colors.white70),
-                ),
             ],
             const SizedBox(height: 26),
             const NdrlSponsorAdWidget(
