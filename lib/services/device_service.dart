@@ -2,6 +2,7 @@ import '../config/app_config.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -140,7 +141,7 @@ class DeviceService extends ChangeNotifier {
         // temporary connection or authentication error.
         final registered = await _api(
           'register',
-          data: {'platform': 'android'},
+          data: {'platform': Platform.isIOS ? 'ios' : 'android'},
         );
         if (_disposed) return;
         final newCredential = registered['credential'];
@@ -174,6 +175,30 @@ class DeviceService extends ChangeNotifier {
       if (_disposed) return;
       firebaseStatus = 'Requesting FCM token...';
       _notify();
+      // On iOS, wait for Apple Push Notification registration before
+      // requesting the Firebase Cloud Messaging token.
+      if (Platform.isIOS) {
+        String? apnsToken;
+
+        for (var attempt = 0; attempt < 15; attempt++) {
+          if (_disposed) return;
+
+          apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+
+          if (apnsToken != null && apnsToken.isNotEmpty) {
+            break;
+          }
+
+          await Future<void>.delayed(const Duration(seconds: 2));
+        }
+
+        if (apnsToken == null || apnsToken.isEmpty) {
+          firebaseStatus = 'Waiting for iOS APNs registration';
+          _notify();
+          return;
+        }
+      }
+
       final token = await FirebaseMessaging.instance.getToken();
       if (_disposed) return;
       _token = token;
