@@ -1,10 +1,11 @@
+import '../config/app_config.dart';
+
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
 class NdrlMembersService {
-  static const endpoint =
-      'https://dev.nostalgiadragleague.com/api/members_public_api.php';
+  static const endpoint = '${AppConfig.baseUrl}/api/members_public_api.php';
 
   final http.Client _client = http.Client();
 
@@ -56,10 +57,8 @@ class NdrlMembersService {
   });
 
   Future<Map<String, dynamic>> driverStats({required int memberId}) async {
-    final uri =
-        Uri.parse(
-          'https://dev.nostalgiadragleague.com/api/standings_public_api.php',
-        ).replace(
+    final uri = Uri.parse('${AppConfig.baseUrl}/api/standings_public_api.php')
+        .replace(
           queryParameters: {
             'action': 'standings.member.stats',
             'member_id': '$memberId',

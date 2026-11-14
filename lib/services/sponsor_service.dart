@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 import 'dart:convert';
 import 'dart:math';
 
@@ -11,8 +13,7 @@ import '../models/sponsor.dart';
 class SponsorService {
   SponsorService._();
 
-  static const _baseUrl =
-      'https://dev.nostalgiadragleague.com/api/sponsors_api.php';
+  static const _baseUrl = '${AppConfig.baseUrl}/api/sponsors_api.php';
   static const _cacheDuration = Duration(minutes: 2);
   static final Map<String, ({DateTime fetchedAt, SponsorAdBatch batch})>
   _cache = {};

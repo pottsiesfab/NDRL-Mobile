@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import '../services/season_context_service.dart';
+
 import 'package:flutter/material.dart';
 
 import 'staging_screen.dart';
@@ -12,6 +16,13 @@ import '../widgets/sponsor_ad_widget.dart';
 import '../services/auth_service.dart';
 import 'account_screen.dart';
 import 'diagnostics_screen.dart';
+import 'about_ndrl_screen.dart';
+import 'news_screen.dart';
+import 'rules_screen.dart';
+import '../services/official_access_service.dart';
+import 'officials_dashboard_screen.dart';
+import 'bounty_board_screen.dart';
+import 'my_tech_cards_screen.dart';
 
 const ndrlBackground = Color(0xFF111111);
 const ndrlSurface = Color(0xFF242428);
@@ -29,6 +40,74 @@ class NdrlAppShell extends StatefulWidget {
 
 class _NdrlAppShellState extends State<NdrlAppShell> {
   int _selectedIndex = 0;
+  static const int _stagingIndex = 5;
+  late final OfficialAccessService _officials;
+  final _seasonContext = SeasonContextService();
+  Timer? _contextTimer;
+  bool _contextRequestInProgress = false;
+  bool _appInForeground = true;
+  int? _liveStagingEventId;
+
+  @override
+  void initState() {
+    super.initState();
+    _officials = OfficialAccessService(widget.authService);
+    WidgetsBinding.instance.addObserver(_officialsLifecycle);
+    _refreshContext();
+    _contextTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (_appInForeground) _refreshContext();
+    });
+  }
+
+  late final WidgetsBindingObserver _officialsLifecycle = _OfficialLifecycle(
+    onResume: () {
+      if (mounted) {
+        _appInForeground = true;
+        _officials.refresh();
+        _refreshContext();
+      }
+    },
+    onBackground: () => _appInForeground = false,
+  );
+
+  @override
+  void dispose() {
+    _contextTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(_officialsLifecycle);
+    _officials.dispose();
+    _seasonContext.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refreshContext() async {
+    if (_contextRequestInProgress) return;
+    _contextRequestInProgress = true;
+    int? activeEventId;
+    try {
+      final context = await _seasonContext.load();
+      final data = context.payload;
+      final staging = data['staging'];
+      if (staging is Map<String, dynamic> && staging['active'] == true) {
+        final id = staging['event_id'];
+        if (id is int && id > 0) activeEventId = id;
+      }
+    } catch (_) {
+      // Fail closed: never advertise an unconfirmed live race.
+    } finally {
+      _contextRequestInProgress = false;
+      if (mounted && _liveStagingEventId != activeEventId) {
+        setState(() => _liveStagingEventId = activeEventId);
+      }
+    }
+  }
+
+  void _openOfficials() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NdrlOfficialsDashboardScreen(officials: _officials),
+      ),
+    );
+  }
 
   static const _destinations = [
     NavigationDestination(
@@ -37,9 +116,9 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       label: 'Home',
     ),
     NavigationDestination(
-      icon: Icon(Icons.flag_outlined),
-      selectedIcon: Icon(Icons.flag),
-      label: 'Staging',
+      icon: Icon(Icons.garage_outlined),
+      selectedIcon: Icon(Icons.garage),
+      label: 'My Garage',
     ),
     NavigationDestination(
       icon: Icon(Icons.event_outlined),
@@ -55,13 +134,30 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   ];
 
   void _openStaging() {
-    setState(() => _selectedIndex = 1);
+    if (_liveStagingEventId == null) return;
+    setState(() => _selectedIndex = _stagingIndex);
+  }
+
+  void _closeStaging() {
+    setState(() => _selectedIndex = 0);
   }
 
   void _openFeature(String title) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => title == 'Fantasy Racing'
+        builder: (_) => title == 'My Tech Cards'
+            ? NdrlMyTechCardsScreen(authService: widget.authService)
+            : title == 'Bounty Board'
+            ? NdrlBountyBoardScreen(authService: widget.authService)
+            : title == 'Contact Us'
+            ? const NdrlAboutScreen(contactsOnly: true)
+            : title == 'NDRL Rules'
+            ? const NdrlRulesScreen()
+            : title == 'NDRL News'
+            ? const NdrlNewsScreen()
+            : title == 'About NDRL'
+            ? const NdrlAboutScreen()
+            : title == 'Fantasy Racing'
             ? NdrlFantasyHubScreen(authService: widget.authService)
             : title == 'NDRL Members' || title == 'Driver Profiles'
             ? const NdrlMembersScreen()
@@ -75,9 +171,11 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   }
 
   void _openDiagnostics() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => NdrlDiagnosticsScreen(authService: widget.authService),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NdrlDiagnosticsScreen(authService: widget.authService),
+      ),
+    );
   }
 
   void _openAccount() {
@@ -109,17 +207,31 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       _HomeScreen(
         onOpenFeature: _openFeature,
         onOpenStaging: _openStaging,
+        showLiveStaging: _liveStagingEventId != null,
         isActive: _selectedIndex == 0,
       ),
-      NdrlStagingScreen(isActive: _selectedIndex == 1),
+      NdrlAccountScreen(authService: widget.authService),
       const NdrlEventsScreen(),
       const NdrlAlertsScreen(),
-      _MoreScreen(
-        onOpenFeature: _openFeature,
-        onOpenNotificationSettings: _openNotificationSettings,
-        onOpenAccount: _openAccount,
-        onOpenDiagnostics: _openDiagnostics,
+      ListenableBuilder(
+        listenable: _officials,
+        builder: (context, _) => _MoreScreen(
+          officials: _officials,
+          onOpenOfficials: _openOfficials,
+          onOpenFeature: _openFeature,
+          onOpenNotificationSettings: _openNotificationSettings,
+          onOpenAccount: _openAccount,
+          onOpenDiagnostics: _openDiagnostics,
+        ),
       ),
+      if (_liveStagingEventId != null)
+        NdrlStagingScreen(
+          key: ValueKey<int>(_liveStagingEventId!),
+          eventId: _liveStagingEventId!,
+          isActive: _selectedIndex == _stagingIndex,
+        )
+      else
+        const SizedBox.shrink(),
     ];
 
     return Scaffold(
@@ -127,9 +239,20 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       appBar: AppBar(
         backgroundColor: ndrlBackground,
         foregroundColor: Colors.white,
-        title: const Text(
-          'NDRL MOBILE',
-          style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5),
+        leading: _selectedIndex == _stagingIndex
+            ? IconButton(
+                tooltip: 'Back to Home',
+                icon: const Icon(Icons.arrow_back, color: ndrlGold),
+                onPressed: _closeStaging,
+              )
+            : null,
+        title: Text(
+          _selectedIndex == _stagingIndex ? 'LIVE STAGING' : 'NDRL MOBILE',
+          style: const TextStyle(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+            decoration: TextDecoration.none,
+          ),
         ),
         actions: [
           IconButton(
@@ -141,7 +264,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       ),
       body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
+        selectedIndex: _selectedIndex == _stagingIndex ? 0 : _selectedIndex,
         onDestinationSelected: (index) {
           setState(() => _selectedIndex = index);
         },
@@ -158,11 +281,13 @@ class _HomeScreen extends StatelessWidget {
   const _HomeScreen({
     required this.onOpenFeature,
     required this.onOpenStaging,
+    required this.showLiveStaging,
     required this.isActive,
   });
 
   final void Function(String) onOpenFeature;
   final VoidCallback onOpenStaging;
+  final bool showLiveStaging;
   final bool isActive;
 
   @override
@@ -182,37 +307,42 @@ class _HomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        Card(
-          color: ndrlRed,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: onOpenStaging,
-            child: const Padding(
-              padding: EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'RACE DAY',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Live Staging Board',
-                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900),
-                  ),
-                  SizedBox(height: 8),
-                  Text('Current class calls and racing rounds'),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Icon(Icons.arrow_forward, size: 28),
-                  ),
-                ],
+        if (showLiveStaging) ...[
+          Card(
+            color: ndrlRed,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onOpenStaging,
+              child: const Padding(
+                padding: EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RACE DAY',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Live Staging Board',
+                      style: TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text('Current class calls and racing rounds'),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Icon(Icons.arrow_forward, size: 28),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 24),
+        ],
         const Text(
           'EXPLORE NDRL',
           style: TextStyle(
@@ -384,67 +514,221 @@ class NdrlFeatureScreen extends StatelessWidget {
   }
 }
 
+class _OfficialLifecycle extends WidgetsBindingObserver {
+  _OfficialLifecycle({required this.onResume, required this.onBackground});
+  final VoidCallback onResume;
+  final VoidCallback onBackground;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      onResume();
+    } else {
+      onBackground();
+    }
+  }
+}
+
 class _MoreScreen extends StatelessWidget {
   const _MoreScreen({
     required this.onOpenFeature,
+    required this.officials,
+    required this.onOpenOfficials,
     required this.onOpenNotificationSettings,
     required this.onOpenAccount,
     required this.onOpenDiagnostics,
   });
 
   final void Function(String) onOpenFeature;
+  final OfficialAccessService officials;
+  final VoidCallback onOpenOfficials;
   final VoidCallback onOpenNotificationSettings;
   final VoidCallback onOpenAccount;
   final VoidCallback onOpenDiagnostics;
 
   @override
   Widget build(BuildContext context) {
-    const entries = [
-      ('My Account', Icons.account_circle_outlined),
-      ('Our Sponsors', Icons.handshake_outlined),
-      ('Season Points', Icons.emoji_events_outlined),
-      ('Fantasy Racing', Icons.sports_score),
-      ('NDRL Members', Icons.people_outline),
-      ('Notification Settings', Icons.settings_outlined),
-      ('Diagnostics', Icons.monitor_heart_outlined),
-      ('About NDRL', Icons.info_outline),
-    ];
-
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
       children: [
-        const Text(
-          'MORE NDRL',
-          style: TextStyle(
-            color: ndrlGold,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
+        const _MoreSectionHeading('MY NDRL'),
+        if (officials.access.enabled)
+          _MoreLinkCard(
+            title: 'Officials / Race Control',
+            description: 'Race management and official tools',
+            icon: Icons.shield_outlined,
+            onTap: onOpenOfficials,
           ),
+        _MoreLinkCard(
+          title: 'Notification Settings',
+          description: 'Manage race alerts and subscriptions',
+          icon: Icons.settings_outlined,
+          onTap: onOpenNotificationSettings,
         ),
-        const SizedBox(height: 16),
-        for (final entry in entries)
-          Card(
-            color: ndrlSurface,
-            child: ListTile(
-              leading: Icon(entry.$2, color: ndrlGold),
-              title: Text(entry.$1),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                if (entry.$1 == 'My Account') {
-                  onOpenAccount();
-                } else if (entry.$1 == 'Diagnostics') {
-                  onOpenDiagnostics();
-                } else if (entry.$1 == 'Notification Settings') {
-                  onOpenNotificationSettings();
-                } else {
-                  onOpenFeature(entry.$1);
-                }
-              },
+        const SizedBox(height: 24),
+        const _MoreSectionHeading('RACING & COMMUNITY'),
+        _MoreLinkCard(
+          title: 'Season Points',
+          description: 'Championship standings and rankings',
+          icon: Icons.emoji_events_outlined,
+          onTap: () => onOpenFeature('Season Points'),
+        ),
+        _MoreLinkCard(
+          title: 'Fantasy Racing',
+          description: 'Build rosters and follow your fantasy team',
+          icon: Icons.sports_score,
+          onTap: () => onOpenFeature('Fantasy Racing'),
+        ),
+        _MoreLinkCard(
+          title: 'Bounty Board',
+          description: 'See who is wanted and who collected',
+          icon: Icons.gps_fixed,
+          onTap: () => onOpenFeature('Bounty Board'),
+        ),
+        _MoreLinkCard(
+          title: 'NDRL Members',
+          description: 'Member directory and driver profiles',
+          icon: Icons.people_outline,
+          onTap: () => onOpenFeature('NDRL Members'),
+        ),
+        _MoreLinkCard(
+          title: 'Our Sponsors',
+          description: 'Support the partners behind NDRL',
+          icon: Icons.handshake_outlined,
+          onTap: () => onOpenFeature('Our Sponsors'),
+        ),
+        const SizedBox(height: 24),
+        const _MoreSectionHeading('NDRL INFORMATION'),
+        _MoreLinkCard(
+          title: 'NDRL News',
+          description: 'Announcements and league updates',
+          icon: Icons.newspaper_outlined,
+          onTap: () => onOpenFeature('NDRL News'),
+        ),
+        _MoreLinkCard(
+          title: 'NDRL Rules',
+          description: 'Class regulations and competition rules',
+          icon: Icons.menu_book_outlined,
+          onTap: () => onOpenFeature('NDRL Rules'),
+        ),
+        _MoreLinkCard(
+          title: 'About NDRL',
+          description: 'Learn about the league',
+          icon: Icons.info_outline,
+          onTap: () => onOpenFeature('About NDRL'),
+        ),
+        _MoreLinkCard(
+          title: 'Contact Us',
+          description: 'Get in touch with NDRL',
+          icon: Icons.contact_phone_outlined,
+          onTap: () => onOpenFeature('Contact Us'),
+        ),
+        const SizedBox(height: 24),
+        const _MoreSectionHeading('APP & SUPPORT'),
+        _MoreLinkCard(
+          title: 'Diagnostics',
+          description: 'Device, connectivity and notification status',
+          icon: Icons.monitor_heart_outlined,
+          onTap: onOpenDiagnostics,
+        ),
+        const SizedBox(height: 24),
+        const NdrlSponsorAdWidget(
+          placement: 'home_featured',
+          isActive: true,
+          heading: 'FEATURED NDRL PARTNER',
+        ),
+      ],
+    );
+  }
+}
+
+class _MoreSectionHeading extends StatelessWidget {
+  const _MoreSectionHeading(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: ndrlGold,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.3,
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreLinkCard extends StatelessWidget {
+  const _MoreLinkCard({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final String description;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: const Color(0xFF111626),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(17),
+          side: const BorderSide(color: Color(0xFF303647)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+            child: Row(
+              children: [
+                Icon(icon, color: ndrlGold, size: 30),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          color: Color(0xFF969CAA),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFF9299A8),
+                  size: 28,
+                ),
+              ],
             ),
           ),
-        const SizedBox(height: 24),
-        const SponsorPlacement(),
-      ],
+        ),
+      ),
     );
   }
 }

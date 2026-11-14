@@ -4,10 +4,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
-import 'screens/app_shell.dart';
 import 'screens/splash_screen.dart';
 import 'services/device_service.dart';
 import 'services/auth_service.dart';
+import 'screens/version_gate_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,7 +67,7 @@ class _NdrlAppState extends State<NdrlApp> {
         useMaterial3: true,
       ),
       home: _splashFinished
-          ? NdrlAppShell(authService: _authService)
+          ? NdrlVersionGateScreen(authService: _authService)
           : NdrlSplashScreen(onFinished: _finishSplash),
     );
   }

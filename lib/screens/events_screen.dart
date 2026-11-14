@@ -1,3 +1,5 @@
+import '../config/app_config.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -5,13 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/season_context_service.dart';
+
 const _background = Color(0xFF111111);
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
-const _seasonId = 3; // DEV season; do not point this screen at production.
-const _catalogUrl =
-    'https://dev.nostalgiadragleague.com/api/notify_catalog_api.php';
+const _catalogUrl = '${AppConfig.baseUrl}/api/notify_catalog_api.php';
 
 class NdrlEventsScreen extends StatefulWidget {
   const NdrlEventsScreen({super.key});
@@ -25,6 +27,7 @@ class _NdrlEventsScreenState extends State<NdrlEventsScreen> {
   List<_RaceEvent> _events = [];
   bool _loading = true;
   String? _error;
+  String? _seasonLabel;
 
   @override
   void initState() {
@@ -46,8 +49,17 @@ class _NdrlEventsScreenState extends State<NdrlEventsScreen> {
       });
     }
     try {
+      // The shared service reads the active season from the authoritative
+      // Portal database; this screen never hardcodes a Portal season ID.
+      final seasonContext = await SeasonContextService(client: _client).load();
+      final seasonId = seasonContext.seasonId;
+      final seasonLabel = seasonContext.seasonName;
+
       final uri = Uri.parse(_catalogUrl).replace(
-        queryParameters: {'action': 'events', 'season_id': '$_seasonId'},
+        queryParameters: {
+          'action': 'events',
+          'season_id': seasonId.toInt().toString(),
+        },
       );
       final response = await _client
           .get(uri, headers: {'Accept': 'application/json'})
@@ -73,7 +85,10 @@ class _NdrlEventsScreenState extends State<NdrlEventsScreen> {
         return dateOrder != 0 ? dateOrder : a.id.compareTo(b.id);
       });
       if (!mounted) return;
-      setState(() => _events = events);
+      setState(() {
+        _events = events;
+        _seasonLabel = seasonLabel;
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Unable to load NDRL events. Please try again.');
@@ -134,9 +149,9 @@ class _NdrlEventsScreenState extends State<NdrlEventsScreen> {
                 ),
               ],
             ),
-            const Text(
-              'DEV TEST · EVENT SCHEDULE',
-              style: TextStyle(color: _gold, fontSize: 11),
+            Text(
+              (_seasonLabel ?? 'ACTIVE SEASON SCHEDULE').toUpperCase(),
+              style: const TextStyle(color: _gold, fontSize: 11),
             ),
             const SizedBox(height: 16),
             if (_loading) const LinearProgressIndicator(color: _red),
@@ -232,9 +247,17 @@ class _RaceEvent {
 
   static Uri? _parseWebUrl(Object? value) {
     if (value is! String || value.trim().isEmpty) return null;
-    final uri = Uri.tryParse(value.trim());
-    return uri != null &&
-            (uri.scheme == 'https' || uri.scheme == 'http') &&
+
+    final parsed = Uri.tryParse(value.trim());
+    if (parsed == null) return null;
+
+    // Portal stores event flyers and information links as relative paths.
+    // Resolve them against the current DEV/PROD base URL.
+    final uri = parsed.hasScheme
+        ? parsed
+        : Uri.parse(AppConfig.baseUrl).resolveUri(parsed);
+
+    return (uri.scheme == 'https' || uri.scheme == 'http') &&
             uri.host.isNotEmpty
         ? uri
         : null;

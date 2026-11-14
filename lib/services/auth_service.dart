@@ -1,13 +1,16 @@
+import '../config/app_config.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import 'device_service.dart';
 
-const _authApi = 'https://dev.nostalgiadragleague.com/api/mobile_auth_api.php';
+const _authApi = '${AppConfig.baseUrl}/api/mobile_auth_api.php';
 const _deviceCredentialKey = 'ndrl_dev_device_credential';
 const _accessKey = 'ndrl_dev_member_access';
 const _refreshKey = 'ndrl_dev_member_refresh';
@@ -21,11 +24,10 @@ class AuthException implements Exception {
 
 class AuthService extends ChangeNotifier {
   AuthService({
-    required DeviceService deviceService,
+    required this._deviceService,
     FlutterSecureStorage? storage,
     http.Client? client,
-  }) : _deviceService = deviceService,
-       _storage = storage ?? const FlutterSecureStorage(),
+  }) : _storage = storage ?? const FlutterSecureStorage(),
        _http = client ?? http.Client();
 
   final DeviceService _deviceService;
@@ -62,8 +64,7 @@ class AuthService extends ChangeNotifier {
       'Accept': 'application/json',
       if (body != null) 'Content-Type': 'application/json',
       if (access != null) 'Authorization': 'Bearer $access',
-      if (deviceCredential != null)
-        'X-NDRL-Device-Credential': deviceCredential,
+      'X-NDRL-Device-Credential': ?deviceCredential,
     };
     try {
       final uri = Uri.parse('$_authApi?action=$action');
@@ -77,8 +78,9 @@ class AuthService extends ChangeNotifier {
                     ))
               .timeout(const Duration(seconds: 20));
       final value = jsonDecode(response.body);
-      if (value is! Map<String, dynamic>)
+      if (value is! Map<String, dynamic>) {
         throw const AuthException('Unexpected server response');
+      }
       if (response.statusCode < 200 ||
           response.statusCode >= 300 ||
           value['success'] != true) {
@@ -171,8 +173,9 @@ class AuthService extends ChangeNotifier {
     if (access == null) throw const AuthException('Not signed in');
     final result = await _request('me', access: access);
     final value = result['account'];
-    if (value is! Map<String, dynamic>)
+    if (value is! Map<String, dynamic>) {
       throw const AuthException('Invalid member profile');
+    }
     account = value;
     _notify();
   }
@@ -224,6 +227,104 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Authenticated JSON POST; refresh once on HTTP 401.
+  /// On timeout, caller should reload server state before retrying a save.
+  Future<Map<String, dynamic>> authorizedPost(
+    Uri uri,
+    Map<String, dynamic> body,
+  ) async {
+    if (_access == null) {
+      if (_refresh == null) throw const AuthException('Please sign in');
+      await refresh();
+    }
+    Future<http.Response> send() => _http
+        .post(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_access',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 25));
+    try {
+      var response = await send();
+      if (response.statusCode == 401) {
+        await refresh();
+        response = await send();
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const AuthException('Unexpected server response');
+      }
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300 ||
+          decoded['success'] != true) {
+        throw AuthException(
+          decoded['error']?.toString() ??
+              'Request failed (HTTP ${response.statusCode})',
+        );
+      }
+      return decoded;
+    } on AuthException {
+      rethrow;
+    } on TimeoutException {
+      throw const AuthException(
+        'Request timed out; reload roster before retrying',
+      );
+    } on FormatException {
+      throw const AuthException('Invalid server response');
+    } catch (_) {
+      throw const AuthException('Unable to connect to NDRL DEV');
+    }
+  }
+
+  /// Authenticated multipart upload; retries only when the server explicitly
+  /// returns 401. Never retry an uncertain network failure automatically.
+  Future<Map<String, dynamic>> authorizedMultipart(
+    Uri uri, {
+    required Map<String, String> fields,
+    required XFile file,
+  }) async {
+    if (_access == null) {
+      if (_refresh == null) throw const AuthException('Please sign in');
+      await refresh();
+    }
+    Future<http.Response> send() async {
+      final request = http.MultipartRequest('POST', uri);
+      request.headers['Accept'] = 'application/json';
+      request.headers['Authorization'] = 'Bearer $_access';
+      request.fields.addAll(fields);
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+      final streamed = await _http.send(request).timeout(const Duration(seconds: 60));
+      return http.Response.fromStream(streamed);
+    }
+    try {
+      var response = await send();
+      if (response.statusCode == 401) {
+        await refresh();
+        response = await send();
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const AuthException('Unexpected upload response');
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300 || decoded['success'] != true) {
+        throw AuthException(decoded['error']?.toString() ?? 'Upload failed (HTTP ${response.statusCode})');
+      }
+      return decoded;
+    } on AuthException {
+      rethrow;
+    } on TimeoutException {
+      throw const AuthException('Upload timed out; check the image before retrying');
+    } on FormatException {
+      throw const AuthException('Invalid upload response');
+    } catch (_) {
+      throw const AuthException('Unable to upload image; check connection');
+    }
+  }
+
   Future<Map<String, dynamic>> loadMemberProfile() async {
     if (_access == null) {
       if (_refresh == null) throw const AuthException('Please sign in');
@@ -232,7 +333,7 @@ class AuthService extends ChangeNotifier {
     Future<http.Response> fetch() => _http
         .get(
           Uri.parse(
-            'https://dev.nostalgiadragleague.com/api/mobile_profile_api.php?action=me',
+            '${AppConfig.baseUrl}/api/mobile_profile_api.php?action=me',
           ),
           headers: {
             'Accept': 'application/json',
@@ -277,7 +378,7 @@ class AuthService extends ChangeNotifier {
     Future<http.Response> send() => _http
         .post(
           Uri.parse(
-            'https://dev.nostalgiadragleague.com/api/mobile_profile_api.php?action=update_profile',
+            '${AppConfig.baseUrl}/api/mobile_profile_api.php?action=update_profile',
           ),
           headers: {
             'Accept': 'application/json',
@@ -295,8 +396,9 @@ class AuthService extends ChangeNotifier {
         response = await send();
       }
       final data = jsonDecode(response.body);
-      if (data is! Map<String, dynamic>)
+      if (data is! Map<String, dynamic>) {
         throw const AuthException('Unexpected server response');
+      }
       if (response.statusCode < 200 ||
           response.statusCode >= 300 ||
           data['success'] != true) {
@@ -320,8 +422,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  static const _profileApi =
-      'https://dev.nostalgiadragleague.com/api/mobile_profile_api.php';
+  static const _profileApi = '${AppConfig.baseUrl}/api/mobile_profile_api.php';
 
   Future<Map<String, dynamic>> profileAction(
     String action,
@@ -346,8 +447,9 @@ class AuthService extends ChangeNotifier {
         response = await send();
       }
       final decoded = jsonDecode(response.body);
-      if (decoded is! Map<String, dynamic>)
+      if (decoded is! Map<String, dynamic>) {
         throw const AuthException('Invalid server response');
+      }
       if (response.statusCode < 200 ||
           response.statusCode >= 300 ||
           decoded['success'] != true) {
@@ -396,8 +498,9 @@ class AuthService extends ChangeNotifier {
         response = await send();
       }
       final decoded = jsonDecode(response.body);
-      if (decoded is! Map<String, dynamic>)
+      if (decoded is! Map<String, dynamic>) {
         throw const AuthException('Invalid upload response');
+      }
       if (response.statusCode < 200 ||
           response.statusCode >= 300 ||
           decoded['success'] != true) {
@@ -430,8 +533,9 @@ class AuthService extends ChangeNotifier {
       );
       await _saveTokens(result);
       final value = result['account'];
-      if (value is! Map<String, dynamic>)
+      if (value is! Map<String, dynamic>) {
         throw const AuthException('Invalid member profile');
+      }
       account = value;
     } finally {
       loading = false;
@@ -462,7 +566,7 @@ class AuthService extends ChangeNotifier {
     loading = true;
     _notify();
     try {
-      if (_refresh == null) _refresh = await _storage.read(key: _refreshKey);
+      _refresh ??= await _storage.read(key: _refreshKey);
       await refresh();
       await _loadMe();
     } finally {
@@ -473,10 +577,11 @@ class AuthService extends ChangeNotifier {
 
   Future<void> logout({bool allDevices = false}) async {
     final access = _access;
-    if (access == null)
+    if (access == null) {
       throw const AuthException(
         'Session unavailable; cannot confirm server logout',
       );
+    }
     try {
       await _request(allDevices ? 'logout_all' : 'logout', access: access);
     } on AuthException {

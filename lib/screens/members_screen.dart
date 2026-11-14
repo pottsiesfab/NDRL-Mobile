@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/members_service.dart';
+import '../services/season_context_service.dart';
 import 'member_profile_screen.dart';
 
 const _background = Color(0xFF111111);
@@ -19,6 +20,7 @@ class NdrlMembersScreen extends StatefulWidget {
 
 class _NdrlMembersScreenState extends State<NdrlMembersScreen> {
   final _service = NdrlMembersService();
+  final _seasonContext = SeasonContextService();
   final _searchController = TextEditingController();
   Timer? _debounce;
   List<Map<String, dynamic>> _seasons = [];
@@ -50,6 +52,7 @@ class _NdrlMembersScreenState extends State<NdrlMembersScreen> {
     _debounce?.cancel();
     _searchController.dispose();
     _service.dispose();
+    _seasonContext.dispose();
     super.dispose();
   }
 
@@ -64,11 +67,14 @@ class _NdrlMembersScreenState extends State<NdrlMembersScreen> {
       _error = null;
     });
     try {
+      final context = await _seasonContext.load();
       final seasons = await _service.seasons();
       if (seasons.isEmpty) throw StateError('No seasons found');
       seasons.sort((a, b) => _number(b['year']).compareTo(_number(a['year'])));
       final seasonId = seasons.any((s) => _number(s['season_id']) == _seasonId)
           ? _seasonId!
+          : seasons.any((s) => _number(s['season_id']) == context.seasonId)
+          ? context.seasonId
           : _number(seasons.first['season_id']);
       if (!mounted || token != _generation) return;
       setState(() {

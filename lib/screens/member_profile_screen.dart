@@ -129,8 +129,9 @@ class _NdrlMemberProfileScreenState extends State<NdrlMemberProfileScreen> {
       if (entries is List) {
         for (final entry in entries.whereType<Map>()) {
           final id = _asInt(entry['class_id']);
-          if (id != null)
+          if (id != null) {
             classOptions[id] = '${entry['class_name'] ?? 'Class $id'}';
+          }
         }
       }
     }

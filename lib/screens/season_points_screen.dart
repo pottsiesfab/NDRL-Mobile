@@ -1,10 +1,14 @@
+import '../config/app_config.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-const _api = 'https://dev.nostalgiadragleague.com/api/standings_public_api.php';
+import '../services/season_context_service.dart';
+
+const _api = '${AppConfig.baseUrl}/api/standings_public_api.php';
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
@@ -70,8 +74,9 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
 
   List<Map<String, dynamic>> _items(Map<String, dynamic> payload) {
     final raw = payload['items'];
-    if (raw is! List)
+    if (raw is! List) {
       throw const FormatException('Standings API returned no items list');
+    }
     return raw.map((item) {
       if (item is! Map) throw const FormatException('Invalid standings entry');
       return Map<String, dynamic>.from(item);
@@ -84,20 +89,25 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
 
   Future<void> _initialize() async {
     final generation = ++_generation;
-    if (mounted)
+    if (mounted) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    }
     try {
+      final context = await SeasonContextService(client: _client).load();
       final seasons = _items(await _get('season.list', {'limit': '200'}));
-      if (seasons.isEmpty)
+      if (seasons.isEmpty) {
         throw StateError('No championship seasons available');
+      }
       seasons.sort(
         (a, b) => _int(b['season_id']).compareTo(_int(a['season_id'])),
       );
       final selected = seasons.any((s) => _int(s['season_id']) == _seasonId)
           ? _seasonId!
+          : seasons.any((s) => _int(s['season_id']) == context.seasonId)
+          ? context.seasonId
           : _int(seasons.first['season_id']);
       final classes = _items(
         await _get('class.list', {'season_id': '$selected', 'limit': '200'}),
@@ -120,11 +130,13 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
         _standings = standings;
       });
     } catch (e) {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _error = _message(e));
+      }
     } finally {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _loading = false);
+      }
     }
   }
 
@@ -171,14 +183,17 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
     });
     try {
       final standings = await _fetchStandings(_seasonId!, value);
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _standings = standings);
+      }
     } catch (e) {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _error = _message(e));
+      }
     } finally {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _loading = false);
+      }
     }
   }
 
@@ -378,13 +393,15 @@ class _DriverStatsScreenState extends State<_DriverStatsScreen> {
         throw StateError('Unable to load driver statistics');
       }
       final data = decoded['message'];
-      if (mounted)
+      if (mounted) {
         setState(() => _data = data is Map<String, dynamic> ? data : decoded);
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = 'Driver statistics are temporarily unavailable.',
         );
+      }
     }
   }
 
