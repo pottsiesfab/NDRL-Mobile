@@ -73,9 +73,9 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       label: 'Home',
     ),
     NavigationDestination(
-      icon: Icon(Icons.flag_outlined),
-      selectedIcon: Icon(Icons.flag),
-      label: 'Staging',
+      icon: Icon(Icons.garage_outlined),
+      selectedIcon: Icon(Icons.garage),
+      label: 'My Garage',
     ),
     NavigationDestination(
       icon: Icon(Icons.event_outlined),
@@ -91,7 +91,11 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   ];
 
   void _openStaging() {
-    setState(() => _selectedIndex = 1);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const NdrlStagingScreen(isActive: true),
+      ),
+    );
   }
 
   void _openFeature(String title) {
@@ -161,7 +165,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
         onOpenStaging: _openStaging,
         isActive: _selectedIndex == 0,
       ),
-      NdrlStagingScreen(isActive: _selectedIndex == 1),
+      NdrlAccountScreen(authService: widget.authService),
       const NdrlEventsScreen(),
       const NdrlAlertsScreen(),
       ListenableBuilder(
@@ -471,18 +475,6 @@ class _MoreScreen extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
       children: [
         const _MoreSectionHeading('MY NDRL'),
-        _MoreLinkCard(
-          title: 'My Account',
-          description: 'Profile, membership and account details',
-          icon: Icons.account_circle_outlined,
-          onTap: onOpenAccount,
-        ),
-        _MoreLinkCard(
-          title: 'My Tech Cards',
-          description: 'View your vehicles and inspection cards',
-          icon: Icons.fact_check_outlined,
-          onTap: () => onOpenFeature('My Tech Cards'),
-        ),
         if (officials.access.enabled)
           _MoreLinkCard(
             title: 'Officials / Race Control',

@@ -45,28 +45,44 @@ void main() {
       ),
     );
 
-    // Navigate to Staging.
-    await tester.tap(find.byIcon(Icons.flag_outlined));
+    // Verify initial Home tab.
+    var navigation = tester.widget<NavigationBar>(find.byType(NavigationBar));
+
+    expect(navigation.selectedIndex, 0);
+
+    // Navigate to My Garage.
+    await tester.tap(find.byIcon(Icons.garage_outlined));
     await tester.pump();
 
-    // Verify the Staging tab is selected.
-    final stagingNavigation = tester.widget<NavigationBar>(
-      find.byType(NavigationBar),
-    );
+    navigation = tester.widget<NavigationBar>(find.byType(NavigationBar));
 
-    expect(stagingNavigation.selectedIndex, 1);
+    expect(navigation.selectedIndex, 1);
 
     // Navigate to Events.
     await tester.tap(find.byIcon(Icons.event_outlined));
     await tester.pump();
 
-    final eventsNavigation = tester.widget<NavigationBar>(
-      find.byType(NavigationBar),
-    );
+    navigation = tester.widget<NavigationBar>(find.byType(NavigationBar));
 
-    expect(eventsNavigation.selectedIndex, 2);
+    expect(navigation.selectedIndex, 2);
 
-    // Verify the Events screen is displayed.
+    // Verify Events screen is displayed.
     expect(find.text('Events'), findsWidgets);
+
+    // Navigate to Alerts.
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pump();
+
+    navigation = tester.widget<NavigationBar>(find.byType(NavigationBar));
+
+    expect(navigation.selectedIndex, 3);
+
+    // Navigate to More.
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pump();
+
+    navigation = tester.widget<NavigationBar>(find.byType(NavigationBar));
+
+    expect(navigation.selectedIndex, 4);
   });
 }
