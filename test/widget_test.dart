@@ -22,7 +22,7 @@ void main() {
     );
 
     expect(find.text('NDRL MOBILE'), findsOneWidget);
-    expect(find.text('Live Staging Board'), findsOneWidget);
+    expect(find.text('Live Staging Board'), findsNothing);
     expect(find.text('Season Points'), findsOneWidget);
     expect(find.text('Fantasy Racing'), findsOneWidget);
     expect(find.text('NDRL Members'), findsOneWidget);

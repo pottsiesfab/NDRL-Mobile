@@ -1,3 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../config/app_config.dart';
+
 import 'package:flutter/material.dart';
 
 import 'staging_screen.dart';
@@ -36,26 +43,72 @@ class NdrlAppShell extends StatefulWidget {
 
 class _NdrlAppShellState extends State<NdrlAppShell> {
   int _selectedIndex = 0;
+  static const int _stagingIndex = 5;
   late final OfficialAccessService _officials;
+  Timer? _contextTimer;
+  bool _contextRequestInProgress = false;
+  bool _appInForeground = true;
+  int? _liveStagingEventId;
 
   @override
   void initState() {
     super.initState();
     _officials = OfficialAccessService(widget.authService);
     WidgetsBinding.instance.addObserver(_officialsLifecycle);
+    _refreshContext();
+    _contextTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (_appInForeground) _refreshContext();
+    });
   }
 
   late final WidgetsBindingObserver _officialsLifecycle = _OfficialLifecycle(
     onResume: () {
-      if (mounted) _officials.refresh();
+      if (mounted) {
+        _appInForeground = true;
+        _officials.refresh();
+        _refreshContext();
+      }
     },
+    onBackground: () => _appInForeground = false,
   );
 
   @override
   void dispose() {
+    _contextTimer?.cancel();
     WidgetsBinding.instance.removeObserver(_officialsLifecycle);
     _officials.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshContext() async {
+    if (_contextRequestInProgress) return;
+    _contextRequestInProgress = true;
+    int? activeEventId;
+    try {
+      final response = await http
+          .get(
+            AppConfig.apiUri('/api/ndrl_context_api.php'),
+            headers: const {'Cache-Control': 'no-cache'},
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) throw StateError('Context unavailable');
+      final data = jsonDecode(response.body);
+      if (data is! Map<String, dynamic> || data['success'] != true) {
+        throw const FormatException('Invalid context');
+      }
+      final staging = data['staging'];
+      if (staging is Map<String, dynamic> && staging['active'] == true) {
+        final id = staging['event_id'];
+        if (id is int && id > 0) activeEventId = id;
+      }
+    } catch (_) {
+      // Fail closed: never advertise an unconfirmed live race.
+    } finally {
+      _contextRequestInProgress = false;
+      if (mounted && _liveStagingEventId != activeEventId) {
+        setState(() => _liveStagingEventId = activeEventId);
+      }
+    }
   }
 
   void _openOfficials() {
@@ -91,11 +144,12 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   ];
 
   void _openStaging() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const NdrlStagingScreen(isActive: true),
-      ),
-    );
+    if (_liveStagingEventId == null) return;
+    setState(() => _selectedIndex = _stagingIndex);
+  }
+
+  void _closeStaging() {
+    setState(() => _selectedIndex = 0);
   }
 
   void _openFeature(String title) {
@@ -163,6 +217,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       _HomeScreen(
         onOpenFeature: _openFeature,
         onOpenStaging: _openStaging,
+        showLiveStaging: _liveStagingEventId != null,
         isActive: _selectedIndex == 0,
       ),
       NdrlAccountScreen(authService: widget.authService),
@@ -179,6 +234,14 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
           onOpenDiagnostics: _openDiagnostics,
         ),
       ),
+      if (_liveStagingEventId != null)
+        NdrlStagingScreen(
+          key: ValueKey<int>(_liveStagingEventId!),
+          eventId: _liveStagingEventId!,
+          isActive: _selectedIndex == _stagingIndex,
+        )
+      else
+        const SizedBox.shrink(),
     ];
 
     return Scaffold(
@@ -186,9 +249,20 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       appBar: AppBar(
         backgroundColor: ndrlBackground,
         foregroundColor: Colors.white,
-        title: const Text(
-          'NDRL MOBILE',
-          style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5),
+        leading: _selectedIndex == _stagingIndex
+            ? IconButton(
+                tooltip: 'Back to Home',
+                icon: const Icon(Icons.arrow_back, color: ndrlGold),
+                onPressed: _closeStaging,
+              )
+            : null,
+        title: Text(
+          _selectedIndex == _stagingIndex ? 'LIVE STAGING' : 'NDRL MOBILE',
+          style: const TextStyle(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+            decoration: TextDecoration.none,
+          ),
         ),
         actions: [
           IconButton(
@@ -200,7 +274,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       ),
       body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
+        selectedIndex: _selectedIndex == _stagingIndex ? 0 : _selectedIndex,
         onDestinationSelected: (index) {
           setState(() => _selectedIndex = index);
         },
@@ -217,11 +291,13 @@ class _HomeScreen extends StatelessWidget {
   const _HomeScreen({
     required this.onOpenFeature,
     required this.onOpenStaging,
+    required this.showLiveStaging,
     required this.isActive,
   });
 
   final void Function(String) onOpenFeature;
   final VoidCallback onOpenStaging;
+  final bool showLiveStaging;
   final bool isActive;
 
   @override
@@ -241,37 +317,42 @@ class _HomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        Card(
-          color: ndrlRed,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: onOpenStaging,
-            child: const Padding(
-              padding: EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'RACE DAY',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Live Staging Board',
-                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900),
-                  ),
-                  SizedBox(height: 8),
-                  Text('Current class calls and racing rounds'),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Icon(Icons.arrow_forward, size: 28),
-                  ),
-                ],
+        if (showLiveStaging) ...[
+          Card(
+            color: ndrlRed,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onOpenStaging,
+              child: const Padding(
+                padding: EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RACE DAY',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Live Staging Board',
+                      style: TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text('Current class calls and racing rounds'),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Icon(Icons.arrow_forward, size: 28),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 24),
+        ],
         const Text(
           'EXPLORE NDRL',
           style: TextStyle(
@@ -444,11 +525,16 @@ class NdrlFeatureScreen extends StatelessWidget {
 }
 
 class _OfficialLifecycle extends WidgetsBindingObserver {
-  _OfficialLifecycle({required this.onResume});
+  _OfficialLifecycle({required this.onResume, required this.onBackground});
   final VoidCallback onResume;
+  final VoidCallback onBackground;
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) onResume();
+    if (state == AppLifecycleState.resumed) {
+      onResume();
+    } else {
+      onBackground();
+    }
   }
 }
 
