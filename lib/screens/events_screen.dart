@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/season_context_service.dart';
+
 const _background = Color(0xFF111111);
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
@@ -47,37 +49,11 @@ class _NdrlEventsScreenState extends State<NdrlEventsScreen> {
       });
     }
     try {
-      // The context API reads the active season from the authoritative Portal
-      // database, so this screen never needs a hardcoded season ID.
-      final contextResponse = await _client
-          .get(
-            AppConfig.apiUri('/api/ndrl_context_api.php'),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 20));
-
-      final contextData = jsonDecode(contextResponse.body);
-      if (contextData is! Map<String, dynamic> ||
-          contextResponse.statusCode != 200 ||
-          contextData['success'] != true) {
-        throw const FormatException('Unable to load NDRL season context');
-      }
-
-      final seasonId = contextData['active_season_id'];
-      if (seasonId is! num || seasonId.toInt() <= 0) {
-        throw const FormatException('No active NDRL season is configured');
-      }
-
-      final activeSeason = contextData['active_season'];
-      final seasonName = activeSeason is Map<String, dynamic>
-          ? activeSeason['name']?.toString()
-          : null;
-      final seasonYear = contextData['active_season_year'];
-      final seasonLabel = seasonName?.trim().isNotEmpty == true
-          ? seasonName!.trim()
-          : seasonYear != null
-          ? '$seasonYear Season'
-          : 'Active Season';
+      // The shared service reads the active season from the authoritative
+      // Portal database; this screen never hardcodes a Portal season ID.
+      final seasonContext = await SeasonContextService(client: _client).load();
+      final seasonId = seasonContext.seasonId;
+      final seasonLabel = seasonContext.seasonName;
 
       final uri = Uri.parse(_catalogUrl).replace(
         queryParameters: {

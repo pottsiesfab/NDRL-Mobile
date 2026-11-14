@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
-import '../config/app_config.dart';
+import '../services/season_context_service.dart';
 
 import 'package:flutter/material.dart';
 
@@ -45,6 +42,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   int _selectedIndex = 0;
   static const int _stagingIndex = 5;
   late final OfficialAccessService _officials;
+  final _seasonContext = SeasonContextService();
   Timer? _contextTimer;
   bool _contextRequestInProgress = false;
   bool _appInForeground = true;
@@ -77,6 +75,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
     _contextTimer?.cancel();
     WidgetsBinding.instance.removeObserver(_officialsLifecycle);
     _officials.dispose();
+    _seasonContext.dispose();
     super.dispose();
   }
 
@@ -85,17 +84,8 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
     _contextRequestInProgress = true;
     int? activeEventId;
     try {
-      final response = await http
-          .get(
-            AppConfig.apiUri('/api/ndrl_context_api.php'),
-            headers: const {'Cache-Control': 'no-cache'},
-          )
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) throw StateError('Context unavailable');
-      final data = jsonDecode(response.body);
-      if (data is! Map<String, dynamic> || data['success'] != true) {
-        throw const FormatException('Invalid context');
-      }
+      final context = await _seasonContext.load();
+      final data = context.payload;
       final staging = data['staging'];
       if (staging is Map<String, dynamic> && staging['active'] == true) {
         final id = staging['event_id'];

@@ -1,18 +1,20 @@
 import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
+import 'season_context_service.dart';
 import '../models/official_access.dart';
 import 'auth_service.dart';
 
 /// Permission discovery is fail-closed: any error clears previously granted access.
 class OfficialAccessService extends ChangeNotifier {
-  OfficialAccessService(this.auth, {this.seasonId = 3}) {
+  OfficialAccessService(this.auth) {
     auth.addListener(_authChanged);
     _authChanged();
   }
 
   final AuthService auth;
-  final int seasonId;
+  final SeasonContextService _seasonContext = SeasonContextService();
+  int seasonId = 0;
   OfficialAccess access = OfficialAccess.none;
   bool loading = false;
   String? error;
@@ -20,7 +22,9 @@ class OfficialAccessService extends ChangeNotifier {
   Object? _accountIdentity;
   bool _disposed = false;
 
-  void _notify() { if (!_disposed) notifyListeners(); }
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
 
   void _authChanged() {
     // Object identity is used to detect account replacement; the API remains
@@ -51,10 +55,15 @@ class OfficialAccessService extends ChangeNotifier {
     loading = true;
     _notify();
     try {
-      final response = await auth.authorizedGet(AppConfig.apiUri(
-        '/mobile/api/mobile_official_access_api.php',
-        queryParameters: {'season_id': '$seasonId'},
-      ));
+      final seasonContext = await _seasonContext.load();
+      if (generation != _generation || !auth.signedIn || _disposed) return;
+      seasonId = seasonContext.seasonId;
+      final response = await auth.authorizedGet(
+        AppConfig.apiUri(
+          '/mobile/api/mobile_official_access_api.php',
+          queryParameters: {'season_id': '$seasonId'},
+        ),
+      );
       final raw = response['official_access'];
       if (raw is! Map<String, dynamic>) {
         throw const AuthException('Invalid official access response');
@@ -78,6 +87,7 @@ class OfficialAccessService extends ChangeNotifier {
     _disposed = true;
     _generation++;
     auth.removeListener(_authChanged);
+    _seasonContext.dispose();
     super.dispose();
   }
 }

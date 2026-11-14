@@ -6,6 +6,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../services/season_context_service.dart';
+
 const _api = '${AppConfig.baseUrl}/api/standings_public_api.php';
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
@@ -94,6 +96,7 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
       });
     }
     try {
+      final context = await SeasonContextService(client: _client).load();
       final seasons = _items(await _get('season.list', {'limit': '200'}));
       if (seasons.isEmpty) {
         throw StateError('No championship seasons available');
@@ -103,6 +106,8 @@ class _NdrlSeasonPointsScreenState extends State<NdrlSeasonPointsScreen> {
       );
       final selected = seasons.any((s) => _int(s['season_id']) == _seasonId)
           ? _seasonId!
+          : seasons.any((s) => _int(s['season_id']) == context.seasonId)
+          ? context.seasonId
           : _int(seasons.first['season_id']);
       final classes = _items(
         await _get('class.list', {'season_id': '$selected', 'limit': '200'}),

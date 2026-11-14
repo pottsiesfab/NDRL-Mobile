@@ -1,7 +1,8 @@
-import '../config/app_config.dart';
-
 import 'dart:async';
 import 'dart:convert';
+
+import '../config/app_config.dart';
+import '../services/season_context_service.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -10,7 +11,6 @@ import 'package:http/http.dart' as http;
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
-const _seasonId = 3; // DEV notification season only.
 const _credentialKey = 'ndrl_dev_device_credential';
 const _base = '${AppConfig.baseUrl}/api';
 
@@ -26,9 +26,11 @@ class _NdrlNotificationSettingsScreenState
     extends State<NdrlNotificationSettingsScreen> {
   final _storage = const FlutterSecureStorage();
   final _client = http.Client();
+  late final _seasonContext = SeasonContextService(client: _client);
   bool _loading = true;
   String? _error;
   String? _seasonName;
+  int? _seasonId;
   bool? _notificationsEnabled;
   List<_ClassSubscription> _classes = [];
   List<_EventSubscription> _events = [];
@@ -60,7 +62,7 @@ class _NdrlNotificationSettingsScreenState
     final uri = Uri.parse('$_base/notify_subscriptions_api.php').replace(
       queryParameters: {
         'action': action,
-        if (action == 'status') 'season_id': '$_seasonId',
+        if (action == 'status' && _seasonId != null) 'season_id': '$_seasonId',
       },
     );
     final headers = <String, String>{
@@ -95,6 +97,8 @@ class _NdrlNotificationSettingsScreenState
       });
     }
     try {
+      final context = await _seasonContext.load();
+      _seasonId = context.seasonId;
       final result = await _request('status');
       final rawClasses = result['classes'];
       final rawEvents = result['events'];
@@ -124,7 +128,9 @@ class _NdrlNotificationSettingsScreenState
           'event_general': rawPrefs['event_general'] == true,
         };
         _notificationsEnabled = result['notifications_enabled'] == true;
-        _seasonName = season is Map ? season['name']?.toString() : null;
+        _seasonName = season is Map
+            ? season['name']?.toString()
+            : context.seasonName;
       });
     } catch (e) {
       if (!mounted) return;
@@ -136,21 +142,17 @@ class _NdrlNotificationSettingsScreenState
 
   String _friendlyError(Object e) {
     if (e is StateError) return e.message.toString();
-    return 'Unable to contact NDRL DEV. Check your connection and try again.';
+    return 'Unable to contact NDRL. Check your connection and try again.';
   }
 
   Future<void> _changeClass(_ClassSubscription item, bool enabled) async {
     final key = 'class:${item.id}';
-    if (_saving.contains(key)) return;
+    if (_seasonId == null || _saving.contains(key)) return;
     setState(() => _saving.add(key));
     try {
       await _request(
         'class.set',
-        data: {
-          'class_id': item.id,
-          'enabled': enabled,
-          if (enabled) 'season_id': _seasonId,
-        },
+        data: {'class_id': item.id, 'enabled': enabled, 'season_id': _seasonId},
       );
       if (!mounted) return;
       setState(() => item.subscribed = enabled);

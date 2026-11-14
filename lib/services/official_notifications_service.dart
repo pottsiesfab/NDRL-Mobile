@@ -21,7 +21,7 @@ class OfficialNotificationsService {
     }
   }
 
-  Future<Map<String, dynamic>> targets({int seasonId = 3}) {
+  Future<Map<String, dynamic>> targets({required int seasonId}) {
     _requireDev();
     return auth.authorizedGet(
       AppConfig.apiUri(
