@@ -196,6 +196,106 @@ class _NdrlNotificationSettingsScreenState
     }
   }
 
+  Future<void> _confirmMuteEvent(_EventSubscription item) async {
+    if (_saving.contains('event:${item.id}')) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Mute event notifications?'),
+        content: Text(
+          'You will stop receiving staging calls and other event notifications '
+          'for ${item.name} on this device. You can turn them back on anytime.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text(
+              'Mute Event',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    await _changeEvent(item, true);
+  }
+
+  Widget _eventMuteCard(_EventSubscription item) {
+    final isSaving = _saving.contains('event:${item.id}');
+    final muted = item.muted;
+    final statusColor = muted ? Colors.redAccent : Colors.greenAccent;
+    return Card(
+      color: _surface,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  muted
+                      ? Icons.notifications_off_outlined
+                      : Icons.notifications_active_outlined,
+                  color: statusColor,
+                  size: 18,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  muted ? 'Muted' : 'Alerts On',
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: isSaving
+                  ? null
+                  : () => muted
+                        ? _changeEvent(item, false)
+                        : _confirmMuteEvent(item),
+              icon: Icon(
+                muted
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_off_outlined,
+                size: 18,
+              ),
+              label: Text(
+                isSaving
+                    ? 'Saving...'
+                    : muted
+                    ? 'Turn Notifications Back On'
+                    : 'Mute This Event',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: muted ? Colors.greenAccent : Colors.redAccent,
+                side: BorderSide(
+                  color: muted ? Colors.greenAccent : Colors.redAccent,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -333,33 +433,6 @@ class _NdrlNotificationSettingsScreenState
               'League news and announcements',
             ),
           ],
-          if (_events.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            const _SectionTitle('MUTE INDIVIDUAL EVENTS'),
-            const SizedBox(height: 6),
-            const Text(
-              'Muting an event suppresses its notifications for this device.',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            for (final item in _events)
-              Card(
-                color: _surface,
-                margin: const EdgeInsets.only(bottom: 8),
-                child: SwitchListTile(
-                  activeThumbColor: _gold,
-                  title: Text(item.name),
-                  subtitle: Text(
-                    item.muted ? 'Muted' : 'Notifications allowed',
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  value: item.muted,
-                  onChanged: _saving.contains('event:${item.id}')
-                      ? null
-                      : (value) => _changeEvent(item, value),
-                ),
-              ),
-          ],
           const SizedBox(height: 24),
           const _SectionTitle('FEATURED NDRL PARTNER'),
           const SizedBox(height: 8),
@@ -376,6 +449,26 @@ class _NdrlNotificationSettingsScreenState
               style: TextStyle(color: Colors.white70),
             ),
           ),
+          if (_events.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const Row(
+              children: [
+                Icon(Icons.notifications_off_outlined, color: Colors.redAccent),
+                SizedBox(width: 8),
+                Expanded(
+                  child: _SectionTitle('MUTE NOTIFICATIONS FOR AN EVENT'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Muting an event turns OFF all notifications for that event on this device. '
+              'Leave events unmuted to continue receiving alerts.',
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 12),
+            for (final item in _events) _eventMuteCard(item),
+          ],
           const SizedBox(height: 24),
         ],
       ),
