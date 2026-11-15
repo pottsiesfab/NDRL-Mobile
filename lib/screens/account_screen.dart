@@ -5,7 +5,8 @@ import 'app_shell.dart';
 import 'login_screen.dart';
 import 'profile_screen.dart';
 import 'my_tech_cards_screen.dart';
-import 'season_points_screen.dart';
+import 'bounty_board_screen.dart';
+import 'my_racing_stats_screen.dart';
 
 /// Account entry point: sign in when logged out; show a simple account
 /// summary when signed in. The full member profile is a separate route.
@@ -188,11 +189,22 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
 
           _garageTile(
             icon: Icons.emoji_events_outlined,
-            title: 'My Championship Points',
-            subtitle: 'Season standings and race results',
+            title: 'My Racing Stats',
+            subtitle: 'Career totals and season-by-season results',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => const NdrlSeasonPointsScreen(),
+                builder: (_) => NdrlMyRacingStatsScreen(authService: auth),
+              ),
+            ),
+          ),
+
+          _garageTile(
+            icon: Icons.gps_fixed,
+            title: 'Bounty Board',
+            subtitle: 'View active bounties and manage your challenges',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => NdrlBountyBoardScreen(authService: auth),
               ),
             ),
           ),
