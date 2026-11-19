@@ -180,8 +180,6 @@ class AuthService extends ChangeNotifier {
     _notify();
   }
 
-  /// Authenticated read-only member profile request. Refresh once on HTTP 401.
-
   /// Authenticated GET for DEV APIs; refreshes once if the access token expires.
   Future<Map<String, dynamic>> authorizedGet(Uri uri) async {
     if (_access == null) {
@@ -590,6 +588,47 @@ class AuthService extends ChangeNotifier {
       await _request(allDevices ? 'logout_all' : 'logout', access: _access);
     }
     await _clearLocal();
+  }
+
+  /// Change the signed-in member's 4-8 digit PIN.
+  /// Automatically refreshes the access token once on HTTP 401.
+  Future<String> changePin({
+    required String currentPin,
+    required String newPin,
+    required String confirmPin,
+  }) async {
+    if (_access == null) {
+      if (_refresh == null) throw const AuthException('Please sign in');
+      await refresh();
+    }
+    final payload = <String, dynamic>{
+      'current_pin': currentPin.trim(),
+      'new_pin': newPin.trim(),
+      'new_pin_confirm': confirmPin.trim(),
+    };
+    try {
+      final res = await _request('change_pin', access: _access, body: payload);
+      return (res['message'] as String?) ?? 'PIN updated successfully';
+    } on AuthException {
+      if (_refresh == null) rethrow;
+      await refresh();
+      final res = await _request('change_pin', access: _access, body: payload);
+      return (res['message'] as String?) ?? 'PIN updated successfully';
+    }
+  }
+
+  /// Request an account claim token (`mode: 'claim'`) or PIN reset link (`mode: 'reset'`).
+  Future<Map<String, dynamic>> requestLoginToken({
+    required String email,
+    String mode = 'claim',
+  }) async {
+    return _request(
+      'request_token',
+      body: {
+        'email': email.trim(),
+        'mode': mode,
+      },
+    );
   }
 
   @override

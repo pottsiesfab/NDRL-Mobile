@@ -44,6 +44,168 @@ class _NdrlLoginScreenState extends State<NdrlLoginScreen> {
     }
   }
 
+  Future<void> _openTokenRequestSheet({required String mode}) async {
+    final isReset = mode == 'reset';
+    final emailCtrl = TextEditingController(text: _email.text.trim());
+    final formKey = GlobalKey<FormState>();
+    bool sending = false;
+    String? feedback;
+    bool isError = false;
+    bool alreadyHasPin = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: ndrlSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate() || sending) return;
+              setSheetState(() {
+                sending = true;
+                feedback = null;
+                isError = false;
+                alreadyHasPin = false;
+              });
+              try {
+                final res = await widget.authService.requestLoginToken(
+                  email: emailCtrl.text,
+                  mode: mode,
+                );
+                setSheetState(() {
+                  feedback = (res['message'] as String?) ??
+                      'Check your inbox for instructions.';
+                  alreadyHasPin = res['already_has_pin'] == true;
+                  isError = false;
+                });
+              } catch (e) {
+                setSheetState(() {
+                  feedback = e is AuthException
+                      ? e.message
+                      : 'Unable to process request right now.';
+                  isError = true;
+                });
+              } finally {
+                if (ctx.mounted) setSheetState(() => sending = false);
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        isReset ? 'RESET MEMBER PIN' : 'REQUEST LOGIN TOKEN',
+                        style: const TextStyle(
+                          color: ndrlGold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        isReset
+                            ? 'Enter the email on your NDRL account and we will send a PIN reset link.'
+                            : 'Enter the email on file with NDRL. We will send you an account claim link to set your PIN.',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.email],
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (v) => v == null || !v.contains('@')
+                            ? 'Enter a valid email address'
+                            : null,
+                      ),
+                      if (feedback != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isError
+                                ? Colors.red.withValues(alpha: 0.15)
+                                : Colors.green.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isError
+                                  ? Colors.orangeAccent
+                                  : Colors.greenAccent,
+                            ),
+                          ),
+                          child: Text(
+                            feedback!,
+                            style: TextStyle(
+                              color: isError
+                                  ? Colors.orangeAccent
+                                  : Colors.greenAccent,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: sending ? null : submit,
+                        icon: Icon(
+                          isReset ? Icons.lock_reset : Icons.mail_outline,
+                        ),
+                        label: Text(
+                          sending
+                              ? 'Sending...'
+                              : (isReset
+                                    ? 'Send Reset Link'
+                                    : 'Send Claim Link'),
+                        ),
+                      ),
+                      if (alreadyHasPin) ...[
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            _openTokenRequestSheet(mode: 'reset');
+                          },
+                          child: const Text('Need to reset your PIN instead?'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (mounted && emailCtrl.text.trim().isNotEmpty) {
+      _email.text = emailCtrl.text.trim();
+    }
+    emailCtrl.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = widget.authService;
@@ -135,6 +297,26 @@ class _NdrlLoginScreenState extends State<NdrlLoginScreen> {
           OutlinedButton(
             onPressed: _busy ? null : () => _run(auth.retry),
             child: const Text('Restore existing session'),
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy
+                ? null
+                : () => _openTokenRequestSheet(mode: 'claim'),
+            icon: const Icon(Icons.vpn_key_outlined, color: ndrlGold),
+            label: const Text('Request Login Token / Claim Account'),
+          ),
+          const SizedBox(height: 6),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => _openTokenRequestSheet(mode: 'reset'),
+            child: const Text(
+              'Forgot PIN?',
+              style: TextStyle(color: Colors.white70),
+            ),
           ),
         ],
       ),

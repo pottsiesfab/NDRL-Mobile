@@ -40,6 +40,190 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
     );
   }
 
+  Future<void> _openChangePinSheet() async {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool hideCurrent = true;
+    bool hideNew = true;
+    bool hideConfirm = true;
+    bool saving = false;
+    String? sheetError;
+
+    final updatedMessage = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: ndrlSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate() || saving) return;
+              setSheetState(() {
+                saving = true;
+                sheetError = null;
+              });
+              try {
+                final msg = await widget.authService.changePin(
+                  currentPin: currentCtrl.text,
+                  newPin: newCtrl.text,
+                  confirmPin: confirmCtrl.text,
+                );
+                if (ctx.mounted) Navigator.of(ctx).pop(msg);
+              } catch (e) {
+                setSheetState(() {
+                  sheetError = e is AuthException
+                      ? e.message
+                      : 'Unable to update PIN right now.';
+                });
+              } finally {
+                if (ctx.mounted) setSheetState(() => saving = false);
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'CHANGE MEMBER PIN',
+                        style: TextStyle(
+                          color: ndrlGold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Enter your current PIN and choose a new 4-8 digit PIN.',
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      const SizedBox(height: 16),
+                      if (sheetError != null) ...[
+                        Text(
+                          sheetError!,
+                          style: const TextStyle(color: Colors.orangeAccent),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      TextFormField(
+                        controller: currentCtrl,
+                        obscureText: hideCurrent,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Current PIN',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              hideCurrent
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () => setSheetState(
+                              () => hideCurrent = !hideCurrent,
+                            ),
+                          ),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Enter current PIN'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: newCtrl,
+                        obscureText: hideNew,
+                        keyboardType: TextInputType.number,
+                        maxLength: 8,
+                        decoration: InputDecoration(
+                          labelText: 'New PIN (4-8 digits)',
+                          counterText: '',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              hideNew ? Icons.visibility : Icons.visibility_off,
+                            ),
+                            onPressed: () =>
+                                setSheetState(() => hideNew = !hideNew),
+                          ),
+                        ),
+                        validator: (v) {
+                          final val = (v ?? '').trim();
+                          if (!RegExp(r'^\d{4,8}$').hasMatch(val)) {
+                            return 'PIN must be 4 to 8 digits';
+                          }
+                          if (val == currentCtrl.text.trim()) {
+                            return 'New PIN must be different from current PIN';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: confirmCtrl,
+                        obscureText: hideConfirm,
+                        keyboardType: TextInputType.number,
+                        maxLength: 8,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New PIN',
+                          counterText: '',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              hideConfirm
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () => setSheetState(
+                              () => hideConfirm = !hideConfirm,
+                            ),
+                          ),
+                        ),
+                        validator: (v) => v?.trim() != newCtrl.text.trim()
+                            ? 'PINs do not match'
+                            : null,
+                      ),
+                      const SizedBox(height: 18),
+                      FilledButton.icon(
+                        onPressed: saving ? null : submit,
+                        icon: const Icon(Icons.lock_reset),
+                        label: Text(saving ? 'Updating...' : 'Update PIN'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    currentCtrl.dispose();
+    newCtrl.dispose();
+    confirmCtrl.dispose();
+
+    if (updatedMessage != null && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(updatedMessage)));
+    }
+  }
+
   Widget _garageTile({
     required IconData icon,
     required String title,
@@ -207,6 +391,13 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
                 builder: (_) => NdrlBountyBoardScreen(authService: auth),
               ),
             ),
+          ),
+
+          _garageTile(
+            icon: Icons.pin_outlined,
+            title: 'Change PIN',
+            subtitle: 'Update your 4-8 digit member login PIN',
+            onTap: _openChangePinSheet,
           ),
 
           const SizedBox(height: 24),
