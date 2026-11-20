@@ -10,7 +10,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'device_service.dart';
 
-const _authApi = '${AppConfig.baseUrl}/api/mobile_auth_api.php';
+const _authApi = '${AppConfig.baseUrl}/mobile/api/mobile_auth_api.php';
 const _deviceCredentialKey = 'ndrl_dev_device_credential';
 const _accessKey = 'ndrl_dev_member_access';
 const _refreshKey = 'ndrl_dev_member_refresh';
@@ -331,7 +331,7 @@ class AuthService extends ChangeNotifier {
     Future<http.Response> fetch() => _http
         .get(
           Uri.parse(
-            '${AppConfig.baseUrl}/api/mobile_profile_api.php?action=me',
+            '${AppConfig.baseUrl}/mobile/api/mobile_profile_api.php?action=me',
           ),
           headers: {
             'Accept': 'application/json',
@@ -376,7 +376,7 @@ class AuthService extends ChangeNotifier {
     Future<http.Response> send() => _http
         .post(
           Uri.parse(
-            '${AppConfig.baseUrl}/api/mobile_profile_api.php?action=update_profile',
+            '${AppConfig.baseUrl}/mobile/api/mobile_profile_api.php?action=update_profile',
           ),
           headers: {
             'Accept': 'application/json',
@@ -420,7 +420,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  static const _profileApi = '${AppConfig.baseUrl}/api/mobile_profile_api.php';
+  static const _profileApi = '${AppConfig.baseUrl}/mobile/api/mobile_profile_api.php';
 
   Future<Map<String, dynamic>> profileAction(
     String action,

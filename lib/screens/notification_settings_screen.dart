@@ -12,7 +12,7 @@ const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
 const _credentialKey = 'ndrl_dev_device_credential';
-const _base = '${AppConfig.baseUrl}/api';
+const _base = '${AppConfig.baseUrl}/mobile/api';
 
 class NdrlNotificationSettingsScreen extends StatefulWidget {
   const NdrlNotificationSettingsScreen({super.key});

@@ -1,4 +1,3 @@
-
 import 'package:image_picker/image_picker.dart';
 
 import '../config/app_config.dart';
@@ -19,7 +18,7 @@ class BountySubmissionService {
   BountySubmissionService(this.auth);
   final AuthService auth;
   Uri _uri(String action, [Map<String, String>? extra]) => AppConfig.apiUri(
-    '/api/bounty_api.php',
+    '/mobile/api/bounty_api.php',
     queryParameters: {'action': action, ...?extra},
   );
 
