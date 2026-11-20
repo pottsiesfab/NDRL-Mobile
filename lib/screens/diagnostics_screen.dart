@@ -184,7 +184,13 @@ class _NdrlDiagnosticsScreenState extends State<NdrlDiagnosticsScreen> {
     checks.add(
       await _checkPublic(
         'Public sponsors API',
-        Uri.parse('$_base/api/sponsors_api.php'),
+        Uri.parse('$_base/api/sponsors_api.php').replace(
+          queryParameters: const {
+            'action': 'ads',
+            'placement': 'staging_banner',
+            'platform': 'android',
+          },
+        ),
       ),
     );
     if (widget.authService.signedIn) {
