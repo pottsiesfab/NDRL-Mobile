@@ -268,8 +268,9 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
       if (!TechCardStepNav.basicsComplete(_card) ||
           (destination.index >= 2 &&
               !TechCardStepNav.modsComplete(_savedMods) &&
-              !TechCardStepNav.isReadOnly(_card)))
+              !TechCardStepNav.isReadOnly(_card))) {
         return;
+      }
       next = destination;
     }
   }
@@ -403,7 +404,7 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
                       positive: true,
                     ),
                     DropdownButtonFormField<String>(
-                      value: _distance,
+                      initialValue: _distance,
                       decoration: const InputDecoration(
                         labelText: 'ET distance',
                         border: OutlineInputBorder(),
@@ -415,11 +416,12 @@ class _NdrlTechCardDetailsScreenState extends State<NdrlTechCardDetailsScreen> {
                       onChanged: _locked || _saving
                           ? null
                           : (value) {
-                              if (value != null)
+                              if (value != null) {
                                 setState(() {
                                   _distance = value;
                                   _dirty = true;
                                 });
+                              }
                             },
                     ),
                     const SizedBox(height: 14),

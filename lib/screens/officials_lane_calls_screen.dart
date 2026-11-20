@@ -132,12 +132,13 @@ class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
         selected.removeWhere((id) => !classes.any((c) => c['class_id'] == id));
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           error = '$e';
           events = [];
           classes = [];
         });
+      }
     } finally {
       if (mounted) setState(() => loading = false);
     }

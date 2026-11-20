@@ -31,11 +31,12 @@ class _NdrlNewsArticleScreenState extends State<NdrlNewsArticleScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
-            if (mounted)
+            if (mounted) {
               setState(() {
                 _loading = true;
                 _failed = false;
               });
+            }
           },
           onPageFinished: (_) {
             if (mounted) setState(() => _loading = false);

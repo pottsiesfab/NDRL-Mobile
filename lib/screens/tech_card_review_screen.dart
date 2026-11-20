@@ -123,8 +123,9 @@ class _NdrlTechCardReviewScreenState extends State<NdrlTechCardReviewScreen> {
     if (!await _confirm(
       'Accept Tech Card declaration',
       'I confirm that the information I have provided is accurate to the best of my knowledge. Record my acceptance?',
-    ))
+    )) {
       return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -149,8 +150,9 @@ class _NdrlTechCardReviewScreenState extends State<NdrlTechCardReviewScreen> {
         _locked ||
         !_accepted ||
         !_validEt ||
-        _missing.isNotEmpty)
+        _missing.isNotEmpty) {
       return;
+    }
     // Refresh the backend-resolved requirements immediately before submitting.
     await _load();
     if (!mounted ||
@@ -158,13 +160,15 @@ class _NdrlTechCardReviewScreenState extends State<NdrlTechCardReviewScreen> {
         _locked ||
         !_accepted ||
         !_validEt ||
-        _missing.isNotEmpty)
+        _missing.isNotEmpty) {
       return;
+    }
     if (!await _confirm(
       'Submit for inspection',
       'Submit this Tech Card for inspection? Once submitted, you will no longer be able to edit it.',
-    ))
+    )) {
       return;
+    }
     setState(() {
       _busy = true;
       _error = null;

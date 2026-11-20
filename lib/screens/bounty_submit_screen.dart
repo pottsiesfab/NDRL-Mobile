@@ -153,11 +153,12 @@ class _NdrlBountySubmitScreenState extends State<NdrlBountySubmitScreen> {
           !ext.endsWith('.jpeg') &&
           !ext.endsWith('.png') &&
           !ext.endsWith('.webp')) {
-        if (mounted)
+        if (mounted) {
           setState(() => _error = 'Choose a JPEG, PNG or WebP image.');
+        }
         return;
       }
-      if (mounted)
+      if (mounted) {
         setState(() {
           if (type == 'target') {
             _target = file;
@@ -166,6 +167,7 @@ class _NdrlBountySubmitScreenState extends State<NdrlBountySubmitScreen> {
           }
           _error = null;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => _error = 'Unable to select image.');
     }
@@ -202,8 +204,9 @@ class _NdrlBountySubmitScreenState extends State<NdrlBountySubmitScreen> {
         'poster': _poster,
       }.entries) {
         if (entry.value == null || _uploaded.contains(entry.key)) continue;
-        if (mounted)
+        if (mounted) {
           setState(() => _progress = 'Uploading ${entry.key} image...');
+        }
         try {
           await _service.upload(_createdId!, entry.key, entry.value!);
           _uploaded.add(entry.key);
@@ -215,11 +218,12 @@ class _NdrlBountySubmitScreenState extends State<NdrlBountySubmitScreen> {
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _progress = '';
         });
+      }
     }
   }
 

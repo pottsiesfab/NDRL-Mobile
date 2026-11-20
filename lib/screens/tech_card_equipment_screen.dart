@@ -235,15 +235,17 @@ class _NdrlTechCardEquipmentScreenState
                             values,
                           );
                           if (!mounted) return;
-                          if (dialogContext.mounted)
+                          if (dialogContext.mounted) {
                             Navigator.pop(dialogContext);
+                          }
                           await _load();
-                          if (mounted)
+                          if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Equipment saved to DEV.'),
                               ),
                             );
+                          }
                         } catch (e) {
                           if (dialogContext.mounted) update(() => error = '$e');
                         } finally {
@@ -422,16 +424,21 @@ class _NdrlTechCardEquipmentScreenState
                                   _flag(saved?['member_attested']) &&
                                   _flag(saved?['member_checked']);
                               final fields = <String>[];
-                              if (_flag(item['show_brand']))
+                              if (_flag(item['show_brand'])) {
                                 fields.add('Brand');
-                              if (_flag(item['requires_serial']))
+                              }
+                              if (_flag(item['requires_serial'])) {
                                 fields.add('Serial');
-                              if (_flag(item['requires_expiry']))
+                              }
+                              if (_flag(item['requires_expiry'])) {
                                 fields.add('Expiration');
-                              if (_flag(item['requires_issuer']))
+                              }
+                              if (_flag(item['requires_issuer'])) {
                                 fields.add('Issuer');
-                              if (_flag(item['requires_sfi']))
+                              }
+                              if (_flag(item['requires_sfi'])) {
                                 fields.add('SFI');
+                              }
                               final description = '${item['description'] ?? ''}'
                                   .trim();
                               return ListTile(

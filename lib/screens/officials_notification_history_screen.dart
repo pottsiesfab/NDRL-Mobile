@@ -120,8 +120,9 @@ class _HistoryState extends State<NdrlOfficialsHistoryScreen>
       );
       if (!mounted ||
           !widget.officials.access.canViewHistory ||
-          eventId != requestedEvent)
+          eventId != requestedEvent) {
         return;
+      }
       final page = _maps(result['items']);
       final pagination = result['pagination'];
       setState(() {
@@ -135,11 +136,12 @@ class _HistoryState extends State<NdrlOfficialsHistoryScreen>
         }
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           history = [];
           error = '$e';
         });
+      }
     } finally {
       if (mounted) setState(() => historyLoading = false);
     }

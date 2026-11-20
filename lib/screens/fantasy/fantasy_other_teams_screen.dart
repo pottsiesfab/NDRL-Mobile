@@ -217,11 +217,12 @@ class _OtherTeamProfileState extends State<_OtherTeamProfile> {
         fantasySeasonId: widget.season.id,
         fantasyTeamId: widget.teamId,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _data = data;
           _error = null;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     }
@@ -365,11 +366,12 @@ class _OtherTeamRosterState extends State<_OtherTeamRoster> {
         fantasyTeamId: widget.teamId,
         fantasyEventId: widget.eventId,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _data = data;
           _error = null;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     }

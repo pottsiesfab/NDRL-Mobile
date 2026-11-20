@@ -71,8 +71,9 @@ class _NdrlMyRacingStatsScreenState extends State<NdrlMyRacingStatsScreen> {
       );
     }
     final message = decoded['message'];
-    if (message is! Map)
+    if (message is! Map) {
       throw const FormatException('Unexpected statistics response');
+    }
     return Map<String, dynamic>.from(message);
   }
 
@@ -143,11 +144,13 @@ class _NdrlMyRacingStatsScreenState extends State<NdrlMyRacingStatsScreen> {
             .toList();
       });
     } catch (e) {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _error = e.toString().replaceFirst('Bad state: ', ''));
+      }
     } finally {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _loading = false);
+      }
     }
   }
 
