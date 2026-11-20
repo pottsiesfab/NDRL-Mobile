@@ -5,7 +5,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class NdrlMembersService {
-  static const endpoint = '${AppConfig.baseUrl}/api/members_public_api.php';
+  static const endpoint =
+      '${AppConfig.baseUrl}/mobile/api/members_public_api.php';
 
   final http.Client _client = http.Client();
 

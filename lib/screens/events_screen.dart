@@ -13,7 +13,7 @@ const _background = Color(0xFF111111);
 const _surface = Color(0xFF242428);
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
-const _catalogUrl = '${AppConfig.baseUrl}/api/notify_catalog_api.php';
+const _catalogUrl = '${AppConfig.baseUrl}/mobile/api/notify_catalog_api.php';
 
 class NdrlEventsScreen extends StatefulWidget {
   const NdrlEventsScreen({super.key});

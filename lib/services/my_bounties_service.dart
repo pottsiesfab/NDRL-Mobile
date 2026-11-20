@@ -68,7 +68,7 @@ class MyBountiesService {
   const MyBountiesService(this.auth);
   final AuthService auth;
   Uri _uri(String action, [Map<String, String>? params]) => AppConfig.apiUri(
-    '/api/bounty_api.php',
+    '/mobile/api/bounty_api.php',
     queryParameters: {'action': action, ...?params},
   );
 

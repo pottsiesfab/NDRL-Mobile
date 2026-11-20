@@ -101,7 +101,7 @@ class BountyService {
     final name = event['name']?.toString() ?? 'NDRL Event';
     final result = await _get(
       AppConfig.apiUri(
-        '/api/bounty_api.php',
+        '/mobile/api/bounty_api.php',
         queryParameters: {'action': 'list', 'event_id': '$id'},
       ),
     );
