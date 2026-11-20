@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "151588538023",
+    "project_id": "ndrl-notifications-prod",
+    "storage_bucket": "ndrl-notifications-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:151588538023:android:193ff35bdf89a307c77d82",
+        "android_client_info": {
+          "package_name": "com.nostalgiadragleague.ndrl"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCZ0uZ_GPHzySo3hz4g2f7YdKcZMZd5uk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

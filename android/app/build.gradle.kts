@@ -69,3 +69,26 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+val dartDefines = if (project.hasProperty("dart-defines")) {
+    project.property("dart-defines").toString().split(",").associate { entry ->
+        val decoded = String(java.util.Base64.getDecoder().decode(entry), Charsets.UTF_8)
+        val parts = decoded.split("=", limit = 2)
+        parts[0] to (parts.getOrElse(1) { "" })
+    }
+} else {
+    emptyMap()
+}
+
+val appEnv = if (dartDefines["APP_ENV"] == "prod") "prod" else "dev"
+
+tasks.matching { it.name.contains("GoogleServices") }.configureEach {
+    doFirst {
+        val src = file("firebase/$appEnv/google-services.json")
+        val dst = file("google-services.json")
+        if (src.exists()) {
+            src.copyTo(dst, overwrite = true)
+            println("NDRL Firebase: Copied $appEnv google-services.json -> app/google-services.json")
+        }
+    }
+}
