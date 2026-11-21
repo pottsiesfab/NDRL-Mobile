@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>NDRL Mobile uses your photo library to let you select and upload photos for racing-related features, including bounty submissions.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>NDRL Mobile uses your camera so you can take profile, race car, and bounty photos.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
