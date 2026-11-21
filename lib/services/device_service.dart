@@ -207,10 +207,24 @@ class DeviceService extends ChangeNotifier {
   }
 
   /// Prompts for permission if not yet asked, or opens OS notification settings if denied.
+  /// Prompts for permission if not yet asked, or opens OS app settings if denied.
   Future<void> enableNotifications() async {
     if (_disposed) return;
+
+    final current = await FirebaseMessaging.instance.getNotificationSettings();
+    if (_disposed) return;
+    authorizationStatus = current.authorizationStatus;
+    permissionChecked = true;
+    permission = current.authorizationStatus.name;
+    _notify();
+
+    if (notificationsPermitted) {
+      await refreshToken();
+      return;
+    }
+
     if (authorizationStatus == AuthorizationStatus.denied) {
-      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+      await AppSettings.openAppSettings();
       return;
     }
 
@@ -228,7 +242,7 @@ class DeviceService extends ChangeNotifier {
     if (notificationsPermitted) {
       await refreshToken();
     } else if (authorizationStatus == AuthorizationStatus.denied) {
-      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+      await AppSettings.openAppSettings();
     }
   }
 
