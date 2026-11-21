@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import '../services/device_service.dart';
 import 'notification_settings_screen.dart';
 
 const _surface = Color(0xFF242428);
@@ -16,7 +17,9 @@ const _api = '${AppConfig.baseUrl}/mobile/api/notify_history_api.php';
 const _credentialKey = 'ndrl_dev_device_credential';
 
 class NdrlAlertsScreen extends StatefulWidget {
-  const NdrlAlertsScreen({super.key});
+  const NdrlAlertsScreen({super.key, required this.deviceService});
+
+  final DeviceService deviceService;
 
   @override
   State<NdrlAlertsScreen> createState() => _NdrlAlertsScreenState();
@@ -164,7 +167,9 @@ class _NdrlAlertsScreenState extends State<NdrlAlertsScreen> {
             backgroundColor: const Color(0xFF111111),
             title: const Text('Notification Settings'),
           ),
-          body: const NdrlNotificationSettingsScreen(),
+          body: NdrlNotificationSettingsScreen(
+            deviceService: widget.deviceService,
+          ),
         ),
       ),
     );

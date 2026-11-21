@@ -67,7 +67,10 @@ class _NdrlAppState extends State<NdrlApp> {
         useMaterial3: true,
       ),
       home: _splashFinished
-          ? NdrlVersionGateScreen(authService: _authService)
+          ? NdrlVersionGateScreen(
+              authService: _authService,
+              deviceService: _deviceService,
+            )
           : NdrlSplashScreen(onFinished: _finishSplash),
     );
   }

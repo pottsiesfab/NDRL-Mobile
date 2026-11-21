@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -72,7 +73,7 @@ flutter {
 
 val dartDefines = if (project.hasProperty("dart-defines")) {
     project.property("dart-defines").toString().split(",").associate { entry ->
-        val decoded = String(java.util.Base64.getDecoder().decode(entry), Charsets.UTF_8)
+        val decoded = String(Base64.getDecoder().decode(entry), Charsets.UTF_8)
         val parts = decoded.split("=", limit = 2)
         parts[0] to (parts.getOrElse(1) { "" })
     }

@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../config/app_config.dart';
+import '../services/device_service.dart';
 import '../services/season_context_service.dart';
+import '../widgets/push_permission_banner.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -15,7 +17,12 @@ const _credentialKey = 'ndrl_dev_device_credential';
 const _base = '${AppConfig.baseUrl}/mobile/api';
 
 class NdrlNotificationSettingsScreen extends StatefulWidget {
-  const NdrlNotificationSettingsScreen({super.key});
+  const NdrlNotificationSettingsScreen({
+    super.key,
+    required this.deviceService,
+  });
+
+  final DeviceService deviceService;
 
   @override
   State<NdrlNotificationSettingsScreen> createState() =>
@@ -40,6 +47,7 @@ class _NdrlNotificationSettingsScreenState
   @override
   void initState() {
     super.initState();
+    unawaited(widget.deviceService.refreshPermissionStatus());
     unawaited(_load());
   }
 
@@ -306,7 +314,10 @@ class _NdrlNotificationSettingsScreenState
   Widget build(BuildContext context) {
     return RefreshIndicator(
       color: _red,
-      onRefresh: _load,
+      onRefresh: () async {
+        await widget.deviceService.refreshPermissionStatus();
+        await _load();
+      },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
@@ -325,7 +336,12 @@ class _NdrlNotificationSettingsScreenState
                 ),
               ),
               IconButton(
-                onPressed: _loading || _saving.isNotEmpty ? null : _load,
+                onPressed: _loading || _saving.isNotEmpty
+                    ? null
+                    : () async {
+                        await widget.deviceService.refreshPermissionStatus();
+                        await _load();
+                      },
                 tooltip: 'Refresh preferences',
                 icon: const Icon(Icons.refresh),
               ),
@@ -336,6 +352,7 @@ class _NdrlNotificationSettingsScreenState
             style: TextStyle(color: _gold, fontSize: 11),
           ),
           const SizedBox(height: 16),
+          PushPermissionBanner(deviceService: widget.deviceService),
           Card(
             color: _surface,
             child: Padding(

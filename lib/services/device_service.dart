@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:app_settings/app_settings.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -38,6 +39,13 @@ class DeviceService extends ChangeNotifier {
   int? deviceId;
   bool isBusy = false;
   bool serverHasToken = false;
+
+  AuthorizationStatus authorizationStatus = AuthorizationStatus.notDetermined;
+  bool permissionChecked = false;
+
+  bool get notificationsPermitted =>
+      authorizationStatus == AuthorizationStatus.authorized ||
+      authorizationStatus == AuthorizationStatus.provisional;
 
   bool get hasCredential => _credential != null;
   String get tokenPreview {
@@ -104,6 +112,8 @@ class DeviceService extends ChangeNotifier {
         sound: true,
       );
       if (_disposed) return;
+      authorizationStatus = settings.authorizationStatus;
+      permissionChecked = true;
       permission = settings.authorizationStatus.name;
       _notify();
 
@@ -167,6 +177,58 @@ class DeviceService extends ChangeNotifier {
       firebaseStatus = 'Setup incomplete';
       serverStatus = '$e';
       _notify();
+    }
+  }
+
+  /// Re-checks OS notification permission status (e.g., on app resume).
+  Future<void> refreshPermissionStatus() async {
+    if (_disposed) return;
+    try {
+      final settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
+      if (_disposed) return;
+      final previous = authorizationStatus;
+      authorizationStatus = settings.authorizationStatus;
+      permissionChecked = true;
+      permission = settings.authorizationStatus.name;
+      _notify();
+
+      // If user just granted notifications in system settings, ensure FCM token is synced.
+      final becamePermitted =
+          previous != AuthorizationStatus.authorized &&
+          previous != AuthorizationStatus.provisional &&
+          notificationsPermitted;
+      if (becamePermitted) {
+        await refreshToken();
+      }
+    } catch (_) {
+      // Keep last known permission state if platform check fails transiently.
+    }
+  }
+
+  /// Prompts for permission if not yet asked, or opens OS notification settings if denied.
+  Future<void> enableNotifications() async {
+    if (_disposed) return;
+    if (authorizationStatus == AuthorizationStatus.denied) {
+      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+      return;
+    }
+
+    final settings = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    if (_disposed) return;
+    authorizationStatus = settings.authorizationStatus;
+    permissionChecked = true;
+    permission = settings.authorizationStatus.name;
+    _notify();
+
+    if (notificationsPermitted) {
+      await refreshToken();
+    } else if (authorizationStatus == AuthorizationStatus.denied) {
+      await AppSettings.openAppSettings(type: AppSettingsType.notification);
     }
   }
 

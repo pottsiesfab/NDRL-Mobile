@@ -17,7 +17,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         themeMode: ThemeMode.dark,
-        home: NdrlAppShell(authService: authService),
+        home: NdrlAppShell(authService: authService, deviceService: deviceService),
       ),
     );
 
@@ -41,7 +41,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         themeMode: ThemeMode.dark,
-        home: NdrlAppShell(authService: authService),
+        home: NdrlAppShell(authService: authService, deviceService: deviceService),
       ),
     );
 

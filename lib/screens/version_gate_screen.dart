@@ -3,11 +3,19 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/auth_service.dart';
 import '../services/app_update_service.dart';
+import '../services/device_service.dart';
 import 'app_shell.dart';
 
 class NdrlVersionGateScreen extends StatefulWidget {
-  const NdrlVersionGateScreen({super.key, required this.authService});
+  const NdrlVersionGateScreen({
+    super.key,
+    required this.authService,
+    required this.deviceService,
+  });
+
   final AuthService authService;
+  final DeviceService deviceService;
+
   @override
   State<NdrlVersionGateScreen> createState() => _NdrlVersionGateScreenState();
 }
@@ -79,7 +87,10 @@ class _NdrlVersionGateScreenState extends State<NdrlVersionGateScreen>
     if (policy != null &&
         !policy.mandatory &&
         (policy.status == 'current' || _skipOptional)) {
-      return NdrlAppShell(authService: widget.authService);
+      return NdrlAppShell(
+        authService: widget.authService,
+        deviceService: widget.deviceService,
+      );
     }
     if (policy == null) {
       return Scaffold(

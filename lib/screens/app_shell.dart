@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../services/season_context_service.dart';
+import '../services/device_service.dart';
+import '../widgets/push_permission_banner.dart';
 
 import 'package:flutter/material.dart';
 
@@ -30,9 +32,14 @@ const ndrlRed = Color(0xFFB91C1C);
 const ndrlGold = Color(0xFFD1AC67);
 
 class NdrlAppShell extends StatefulWidget {
-  const NdrlAppShell({super.key, required this.authService});
+  const NdrlAppShell({
+    super.key,
+    required this.authService,
+    required this.deviceService,
+  });
 
   final AuthService authService;
+  final DeviceService deviceService;
 
   @override
   State<NdrlAppShell> createState() => _NdrlAppShellState();
@@ -65,6 +72,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
         _appInForeground = true;
         _officials.refresh();
         _refreshContext();
+        unawaited(widget.deviceService.refreshPermissionStatus());
       }
     },
     onBackground: () => _appInForeground = false,
@@ -195,7 +203,9 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
             backgroundColor: ndrlBackground,
             title: const Text('Notification Settings'),
           ),
-          body: const NdrlNotificationSettingsScreen(),
+          body: NdrlNotificationSettingsScreen(
+            deviceService: widget.deviceService,
+          ),
         ),
       ),
     );
@@ -205,6 +215,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
   Widget build(BuildContext context) {
     final pages = [
       _HomeScreen(
+        deviceService: widget.deviceService,
         onOpenFeature: _openFeature,
         onOpenStaging: _openStaging,
         showLiveStaging: _liveStagingEventId != null,
@@ -212,7 +223,7 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
       ),
       NdrlAccountScreen(authService: widget.authService),
       const NdrlEventsScreen(),
-      const NdrlAlertsScreen(),
+      NdrlAlertsScreen(deviceService: widget.deviceService),
       ListenableBuilder(
         listenable: _officials,
         builder: (context, _) => _MoreScreen(
@@ -279,12 +290,14 @@ class _NdrlAppShellState extends State<NdrlAppShell> {
 
 class _HomeScreen extends StatelessWidget {
   const _HomeScreen({
+    required this.deviceService,
     required this.onOpenFeature,
     required this.onOpenStaging,
     required this.showLiveStaging,
     required this.isActive,
   });
 
+  final DeviceService deviceService;
   final void Function(String) onOpenFeature;
   final VoidCallback onOpenStaging;
   final bool showLiveStaging;
@@ -307,6 +320,7 @@ class _HomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
+        PushPermissionBanner(deviceService: deviceService, compact: true),
         if (showLiveStaging) ...[
           Card(
             color: ndrlRed,
