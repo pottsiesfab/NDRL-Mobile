@@ -295,9 +295,12 @@ class AuthService extends ChangeNotifier {
       request.headers['Authorization'] = 'Bearer $_access';
       request.fields.addAll(fields);
       request.files.add(await http.MultipartFile.fromPath('file', file.path));
-      final streamed = await _http.send(request).timeout(const Duration(seconds: 60));
+      final streamed = await _http
+          .send(request)
+          .timeout(const Duration(seconds: 60));
       return http.Response.fromStream(streamed);
     }
+
     try {
       var response = await send();
       if (response.statusCode == 401) {
@@ -308,14 +311,21 @@ class AuthService extends ChangeNotifier {
       if (decoded is! Map<String, dynamic>) {
         throw const AuthException('Unexpected upload response');
       }
-      if (response.statusCode < 200 || response.statusCode >= 300 || decoded['success'] != true) {
-        throw AuthException(decoded['error']?.toString() ?? 'Upload failed (HTTP ${response.statusCode})');
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300 ||
+          decoded['success'] != true) {
+        throw AuthException(
+          decoded['error']?.toString() ??
+              'Upload failed (HTTP ${response.statusCode})',
+        );
       }
       return decoded;
     } on AuthException {
       rethrow;
     } on TimeoutException {
-      throw const AuthException('Upload timed out; check the image before retrying');
+      throw const AuthException(
+        'Upload timed out; check the image before retrying',
+      );
     } on FormatException {
       throw const AuthException('Invalid upload response');
     } catch (_) {
@@ -420,7 +430,8 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  static const _profileApi = '${AppConfig.baseUrl}/mobile/api/mobile_profile_api.php';
+  static const _profileApi =
+      '${AppConfig.baseUrl}/mobile/api/mobile_profile_api.php';
 
   Future<Map<String, dynamic>> profileAction(
     String action,
@@ -624,11 +635,28 @@ class AuthService extends ChangeNotifier {
   }) async {
     return _request(
       'request_token',
-      body: {
-        'email': email.trim(),
-        'mode': mode,
-      },
+      body: {'email': email.trim(), 'mode': mode},
     );
+  }
+
+  /// Permanently delete the signed-in member's online account and clear local session state.
+  Future<String> deleteAccount({required String pin}) async {
+    if (_access == null) {
+      if (_refresh == null) throw const AuthException('Please sign in');
+      await refresh();
+    }
+    final payload = <String, dynamic>{'pin': pin.trim(), 'confirm': 'DELETE'};
+    Map<String, dynamic> res;
+    try {
+      res = await _request('delete_account', access: _access, body: payload);
+    } on AuthException {
+      if (_refresh == null) rethrow;
+      await refresh();
+      res = await _request('delete_account', access: _access, body: payload);
+    }
+    await _clearLocal();
+    return (res['message'] as String?) ??
+        'Your online NDRL account has been deleted.';
   }
 
   @override
