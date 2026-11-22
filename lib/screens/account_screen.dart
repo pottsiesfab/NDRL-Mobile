@@ -134,9 +134,8 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
                                   ? Icons.visibility
                                   : Icons.visibility_off,
                             ),
-                            onPressed: () => setSheetState(
-                              () => hideCurrent = !hideCurrent,
-                            ),
+                            onPressed: () =>
+                                setSheetState(() => hideCurrent = !hideCurrent),
                           ),
                         ),
                         validator: (v) => v == null || v.trim().isEmpty
@@ -188,9 +187,8 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
                                   ? Icons.visibility
                                   : Icons.visibility_off,
                             ),
-                            onPressed: () => setSheetState(
-                              () => hideConfirm = !hideConfirm,
-                            ),
+                            onPressed: () =>
+                                setSheetState(() => hideConfirm = !hideConfirm),
                           ),
                         ),
                         validator: (v) => v?.trim() != newCtrl.text.trim()
@@ -218,9 +216,202 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
     confirmCtrl.dispose();
 
     if (updatedMessage != null && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(updatedMessage)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(updatedMessage)));
+    }
+  }
+
+  Future<void> _openDeleteAccountSheet() async {
+    final pinCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool hidePin = true;
+    bool deleting = false;
+    String? sheetError;
+
+    final deletedMessage = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: ndrlSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate() || deleting) return;
+              setSheetState(() {
+                deleting = true;
+                sheetError = null;
+              });
+              try {
+                final msg = await widget.authService.deleteAccount(
+                  pin: pinCtrl.text,
+                );
+                if (ctx.mounted) Navigator.of(ctx).pop(msg);
+              } catch (e) {
+                setSheetState(() {
+                  sheetError = e is AuthException
+                      ? e.message
+                      : 'Unable to delete account right now.';
+                });
+              } finally {
+                if (ctx.mounted) setSheetState(() => deleting = false);
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: ndrlRed),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'DELETE ONLINE ACCOUNT',
+                              style: TextStyle(
+                                color: ndrlRed,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'This action is permanent and will immediately:',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              '• Delete your online login credentials (email & PIN)\n'
+                              '• Revoke all active app sessions & push device links\n'
+                              '• Remove your uploaded member and race car photos',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12.5,
+                                height: 1.4,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Official NDRL club membership records and historical race results are retained for league record-keeping.',
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (sheetError != null) ...[
+                        Text(
+                          sheetError!,
+                          style: const TextStyle(color: Colors.orangeAccent),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      TextFormField(
+                        controller: pinCtrl,
+                        obscureText: hidePin,
+                        keyboardType: TextInputType.number,
+                        maxLength: 8,
+                        decoration: InputDecoration(
+                          labelText: 'Current Member PIN',
+                          counterText: '',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              hidePin ? Icons.visibility : Icons.visibility_off,
+                            ),
+                            onPressed: () =>
+                                setSheetState(() => hidePin = !hidePin),
+                          ),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Enter your current PIN'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: confirmCtrl,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: 'Type DELETE to confirm',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (v) =>
+                            (v ?? '').trim().toUpperCase() != 'DELETE'
+                            ? 'Type DELETE exactly to confirm'
+                            : null,
+                      ),
+                      const SizedBox(height: 18),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: ndrlRed,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: deleting ? null : submit,
+                        icon: const Icon(Icons.delete_forever),
+                        label: Text(
+                          deleting
+                              ? 'Deleting Account...'
+                              : 'Permanently Delete Account',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: deleting
+                            ? null
+                            : () => Navigator.of(ctx).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    pinCtrl.dispose();
+    confirmCtrl.dispose();
+
+    if (deletedMessage != null && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(deletedMessage)));
     }
   }
 
@@ -418,6 +609,15 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
                 style: const TextStyle(color: Colors.orangeAccent),
               ),
             ),
+
+          const SizedBox(height: 20),
+
+          TextButton.icon(
+            onPressed: _loggingOut ? null : _openDeleteAccountSheet,
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            icon: const Icon(Icons.delete_outline, size: 20),
+            label: const Text('Delete Online Account'),
+          ),
         ],
       ),
     );
