@@ -228,8 +228,9 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
     bool hidePin = true;
     bool deleting = false;
     String? sheetError;
+    String? pendingPin;
 
-    final deletedMessage = await showModalBottomSheet<String>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: ndrlSurface,
@@ -239,26 +240,10 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            Future<void> submit() async {
+            void submit() {
               if (!formKey.currentState!.validate() || deleting) return;
-              setSheetState(() {
-                deleting = true;
-                sheetError = null;
-              });
-              try {
-                final msg = await widget.authService.deleteAccount(
-                  pin: pinCtrl.text,
-                );
-                if (ctx.mounted) Navigator.of(ctx).pop(msg);
-              } catch (e) {
-                setSheetState(() {
-                  sheetError = e is AuthException
-                      ? e.message
-                      : 'Unable to delete account right now.';
-                });
-              } finally {
-                if (ctx.mounted) setSheetState(() => deleting = false);
-              }
+              pendingPin = pinCtrl.text;
+              Navigator.of(ctx).pop(true);
             }
 
             return Padding(
@@ -383,17 +368,13 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
                         ),
                         onPressed: deleting ? null : submit,
                         icon: const Icon(Icons.delete_forever),
-                        label: Text(
-                          deleting
-                              ? 'Deleting Account...'
-                              : 'Permanently Delete Account',
-                        ),
+                        label: const Text('Permanently Delete Account'),
                       ),
                       const SizedBox(height: 8),
                       TextButton(
                         onPressed: deleting
                             ? null
-                            : () => Navigator.of(ctx).pop(),
+                            : () => Navigator.of(ctx).pop(false),
                         child: const Text('Cancel'),
                       ),
                     ],
@@ -406,12 +387,26 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
       },
     );
 
-    pinCtrl.dispose();
-    confirmCtrl.dispose();
+    if (confirmed != true || pendingPin == null || !mounted) return;
 
-    if (deletedMessage != null && mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(deletedMessage)));
+    setState(() {
+      _loggingOut = true;
+      _error = null;
+    });
+    try {
+      final messenger = ScaffoldMessenger.of(context);
+      final msg = await widget.authService.deleteAccount(pin: pendingPin!);
+      messenger.showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e is AuthException
+              ? e.message
+              : 'Unable to delete account right now.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loggingOut = false);
     }
   }
 
