@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/bounty_service.dart';
+import '../widgets/report_content_sheet.dart';
 
 const _gold = Color(0xFFD1AC67);
 const _red = Color(0xFFB91C1C);
@@ -8,20 +9,57 @@ const _background = Color(0xFF111111);
 const _surface = Color(0xFF111626);
 
 /// Read-only bounty details using the record already loaded by the board.
-/// No additional API endpoint or authentication is required.
-class NdrlBountyDetailScreen extends StatelessWidget {
+class NdrlBountyDetailScreen extends StatefulWidget {
   const NdrlBountyDetailScreen({super.key, required this.bounty});
 
   final BountyRecord bounty;
 
   @override
+  State<NdrlBountyDetailScreen> createState() => _NdrlBountyDetailScreenState();
+}
+
+class _NdrlBountyDetailScreenState extends State<NdrlBountyDetailScreen> {
+  final _service = BountyService();
+
+  @override
+  void dispose() {
+    _service.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reportBounty() async {
+    final bountyId =
+        int.tryParse('${widget.bounty.data['bounty_id'] ?? ''}') ?? 0;
+    if (bountyId <= 0) return;
+    await showReportContentSheet(
+      context: context,
+      title: 'REPORT BOUNTY',
+      subtitle:
+          'Flag "${widget.bounty.title}" or its photos for review by NDRL officials.',
+      onSubmit: (reason, notes) => _service.reportBounty(
+        bountyId: bountyId,
+        reason: reason,
+        notes: notes,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bounty = widget.bounty;
     final claimed = bounty.isClaimed;
     return Scaffold(
       backgroundColor: _background,
       appBar: AppBar(
         backgroundColor: _background,
         title: const Text('BOUNTY DETAILS'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: 'Report Bounty',
+            onPressed: _reportBounty,
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),

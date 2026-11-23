@@ -55,7 +55,6 @@ class BountyRecord {
     final parsed = Uri.tryParse(raw.trim());
     if (parsed == null) return null;
     final resolved = Uri.parse(AppConfig.baseUrl).resolveUri(parsed);
-    // Never fetch images from an insecure or unexpected host.
     if (resolved.scheme != 'https') return null;
     return resolved;
   }
@@ -116,5 +115,36 @@ class BountyService {
         return BountyRecord(data: Map<String, dynamic>.from(item));
       }).toList(),
     );
+  }
+
+  Future<String> reportBounty({
+    required int bountyId,
+    required String reason,
+    String notes = '',
+  }) async {
+    final response = await _client
+        .post(
+          AppConfig.apiUri(
+            '/mobile/api/bounty_api.php',
+            queryParameters: {'action': 'report'},
+          ),
+          headers: const {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'bounty_id': bountyId,
+            'reason': reason,
+            'notes': notes,
+          }),
+        )
+        .timeout(const Duration(seconds: 20));
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+      final msg = decoded is Map ? decoded['error']?.toString() : null;
+      throw StateError(msg ?? 'Unable to submit report.');
+    }
+    return (decoded['message'] as String?) ??
+        'Report submitted to NDRL officials.';
   }
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/members_service.dart';
+import '../widgets/report_content_sheet.dart';
 
 const _background = Color(0xFF111111);
 const _surface = Color(0xFF242428);
@@ -100,6 +101,35 @@ class _NdrlMemberProfileScreenState extends State<NdrlMemberProfileScreen> {
   String _string(dynamic value) => value?.toString() ?? '';
   int? _asInt(dynamic value) => value is int ? value : int.tryParse('$value');
 
+  Future<void> _reportMemberAvatar(String memberName) async {
+    await showReportContentSheet(
+      context: context,
+      title: 'REPORT PROFILE PHOTO',
+      subtitle:
+          "Flag $memberName's profile photo for review by NDRL officials.",
+      onSubmit: (reason, notes) => _service.reportAvatar(
+        targetType: 'member_avatar',
+        targetId: widget.memberId,
+        reason: reason,
+        notes: notes,
+      ),
+    );
+  }
+
+  Future<void> _reportCarAvatar(int mscId, String label) async {
+    await showReportContentSheet(
+      context: context,
+      title: 'REPORT CAR PHOTO',
+      subtitle: 'Flag $label photo for review by NDRL officials.',
+      onSubmit: (reason, notes) => _service.reportAvatar(
+        targetType: 'car_avatar',
+        targetId: mscId,
+        reason: reason,
+        notes: notes,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final member = _member;
@@ -110,19 +140,33 @@ class _NdrlMemberProfileScreenState extends State<NdrlMemberProfileScreen> {
     final city = _string(member?['city']);
     final state = _string(member?['state']);
     final location = [city, state].where((s) => s.isNotEmpty).join(', ');
+    final personAvatarUrl = _string(member?['avatar_person_url']);
     final cars = member?['cars'] is List
         ? member!['cars'] as List
         : <dynamic>[];
-    final seasons = _stats?['seasons'] is List
+
+    final rawSeasons = _stats?['seasons'] is List
         ? (_stats!['seasons'] as List).whereType<Map>().toList()
         : <Map>[];
+    final seenSeasonIds = <int>{};
+    final seasons = <Map>[];
+    for (final season in rawSeasons) {
+      final id = _asInt(season['season_id']);
+      if (id != null && seenSeasonIds.add(id)) {
+        seasons.add(season);
+      }
+    }
+    final activeSeason = seenSeasonIds.contains(_selectedSeasonId)
+        ? _selectedSeasonId
+        : null;
     final selectedSeasons = seasons
         .where(
           (s) =>
-              _selectedSeasonId == null ||
-              _asInt(s['season_id']) == _selectedSeasonId,
+              activeSeason == null ||
+              _asInt(s['season_id']) == activeSeason,
         )
         .toList();
+
     final classOptions = <int, String>{};
     for (final season in selectedSeasons) {
       final entries = season['classes'];
@@ -166,7 +210,7 @@ class _NdrlMemberProfileScreenState extends State<NdrlMemberProfileScreen> {
                   child: Row(
                     children: [
                       NdrlMemberAvatar(
-                        url: _string(member['avatar_person_url']),
+                        url: personAvatarUrl,
                         radius: 38,
                       ),
                       const SizedBox(width: 16),
@@ -199,6 +243,16 @@ class _NdrlMemberProfileScreenState extends State<NdrlMemberProfileScreen> {
                           ],
                         ),
                       ),
+                      if (personAvatarUrl.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(
+                            Icons.flag_outlined,
+                            size: 20,
+                            color: Colors.white54,
+                          ),
+                          tooltip: 'Report Profile Photo',
+                          onPressed: () => _reportMemberAvatar(name),
+                        ),
                     ],
                   ),
                 ),
@@ -228,8 +282,8 @@ class _NdrlMemberProfileScreenState extends State<NdrlMemberProfileScreen> {
                 if (seasons.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int?>(
-                    key: ValueKey('profile-season-$_selectedSeasonId'),
-                    initialValue: _selectedSeasonId,
+                    key: ValueKey('profile-season-$activeSeason'),
+                    initialValue: activeSeason,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Season',
@@ -257,7 +311,7 @@ class _NdrlMemberProfileScreenState extends State<NdrlMemberProfileScreen> {
                   const SizedBox(height: 10),
                   DropdownButtonFormField<int?>(
                     key: ValueKey(
-                      'profile-class-$_selectedSeasonId-$activeClass',
+                      'profile-class-$activeSeason-$activeClass',
                     ),
                     initialValue: activeClass,
                     isExpanded: true,
@@ -314,49 +368,75 @@ class _NdrlMemberProfileScreenState extends State<NdrlMemberProfileScreen> {
                 const SizedBox(height: 8),
                 for (final entry in cars)
                   if (entry is Map)
-                    Card(
-                      color: _surface,
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            NdrlMemberAvatar(
-                              url: _string(entry['avatar_car_url']),
-                              radius: 32,
-                              fallback: Icons.directions_car_outlined,
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _string(entry['class_name']),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
+                    Builder(
+                      builder: (context) {
+                        final carAvatarUrl = _string(entry['avatar_car_url']);
+                        final mscId = _asInt(entry['member_season_class_id']);
+                        final className = _string(entry['class_name']);
+                        final carNumber = _string(entry['car_number']);
+                        return Card(
+                          color: _surface,
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              children: [
+                                NdrlMemberAvatar(
+                                  url: carAvatarUrl,
+                                  radius: 32,
+                                  fallback: Icons.directions_car_outlined,
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        className,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      if (_string(entry['car_desc']).isNotEmpty)
+                                        Text(
+                                          _string(entry['car_desc']),
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '#$carNumber',
+                                  style: const TextStyle(
+                                    color: _gold,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                if (carAvatarUrl.isNotEmpty &&
+                                    mscId != null &&
+                                    mscId > 0) ...[
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.flag_outlined,
+                                      size: 20,
+                                      color: Colors.white54,
+                                    ),
+                                    tooltip: 'Report Car Photo',
+                                    onPressed: () => _reportCarAvatar(
+                                      mscId,
+                                      "$name's #$carNumber ($className)",
                                     ),
                                   ),
-                                  if (_string(entry['car_desc']).isNotEmpty)
-                                    Text(
-                                      _string(entry['car_desc']),
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                      ),
-                                    ),
                                 ],
-                              ),
+                              ],
                             ),
-                            Text(
-                              '#${_string(entry['car_number'])}',
-                              style: const TextStyle(
-                                color: _gold,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 18,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      },
                     ),
               ],
             ],
@@ -648,7 +728,7 @@ class NdrlMemberAvatar extends StatelessWidget {
                 width: radius * 2,
                 height: radius * 2,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
+                errorBuilder: (context, error, stackTrace) =>
                     Icon(fallback, color: _gold, size: radius),
               )
             : Icon(fallback, color: _gold, size: radius),

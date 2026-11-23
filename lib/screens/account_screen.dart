@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import 'app_shell.dart';
@@ -49,7 +49,7 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
     bool hideNew = true;
     bool hideConfirm = true;
     bool saving = false;
-    String? sheetError;
+    String sheetError = '';
 
     final updatedMessage = await showModalBottomSheet<String>(
       context: context,
@@ -65,7 +65,7 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
               if (!formKey.currentState!.validate() || saving) return;
               setSheetState(() {
                 saving = true;
-                sheetError = null;
+                sheetError = '';
               });
               try {
                 final msg = await widget.authService.changePin(
@@ -114,9 +114,9 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
                         style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
                       const SizedBox(height: 16),
-                      if (sheetError != null) ...[
+                      if (sheetError.isNotEmpty) ...[
                         Text(
-                          sheetError!,
+                          sheetError,
                           style: const TextStyle(color: Colors.orangeAccent),
                         ),
                         const SizedBox(height: 12),
@@ -226,8 +226,7 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
     final confirmCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool hidePin = true;
-    bool deleting = false;
-    String? sheetError;
+    String sheetError = '';
     String? pendingPin;
 
     final confirmed = await showModalBottomSheet<bool>(
@@ -241,7 +240,7 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             void submit() {
-              if (!formKey.currentState!.validate() || deleting) return;
+              if (!formKey.currentState!.validate()) return;
               pendingPin = pinCtrl.text;
               Navigator.of(ctx).pop(true);
             }
@@ -298,9 +297,9 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
                             ),
                             SizedBox(height: 6),
                             Text(
-                              '• Delete your online login credentials (email & PIN)\n'
-                              '• Revoke all active app sessions & push device links\n'
-                              '• Remove your uploaded member and race car photos',
+                              'â€¢ Delete your online login credentials (email & PIN)\n'
+                              'â€¢ Revoke all active app sessions & push device links\n'
+                              'â€¢ Remove your uploaded member and race car photos',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12.5,
@@ -319,9 +318,9 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      if (sheetError != null) ...[
+                      if (sheetError.isNotEmpty) ...[
                         Text(
-                          sheetError!,
+                          sheetError,
                           style: const TextStyle(color: Colors.orangeAccent),
                         ),
                         const SizedBox(height: 10),
@@ -366,15 +365,13 @@ class _NdrlAccountScreenState extends State<NdrlAccountScreen> {
                           backgroundColor: ndrlRed,
                           foregroundColor: Colors.white,
                         ),
-                        onPressed: deleting ? null : submit,
+                        onPressed: submit,
                         icon: const Icon(Icons.delete_forever),
                         label: const Text('Permanently Delete Account'),
                       ),
                       const SizedBox(height: 8),
                       TextButton(
-                        onPressed: deleting
-                            ? null
-                            : () => Navigator.of(ctx).pop(false),
+                        onPressed: () => Navigator.of(ctx).pop(false),
                         child: const Text('Cancel'),
                       ),
                     ],
