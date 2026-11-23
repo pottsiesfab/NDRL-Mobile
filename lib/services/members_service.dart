@@ -1,8 +1,8 @@
-import '../config/app_config.dart';
-
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+
+import '../config/app_config.dart';
 
 class NdrlMembersService {
   static const endpoint =
@@ -49,13 +49,14 @@ class NdrlMembersService {
     int offset = 0,
     int limit = 20,
     int? classId,
-  }) => _request(associates ? 'associates.search' : 'drivers.search', {
-    'season_id': '$seasonId',
-    'q': query,
-    'offset': '$offset',
-    'limit': '$limit',
-    if (!associates && classId != null) 'class_id': '$classId',
-  });
+  }) =>
+      _request(associates ? 'associates.search' : 'drivers.search', {
+        'season_id': '$seasonId',
+        'q': query,
+        'offset': '$offset',
+        'limit': '$limit',
+        if (!associates && classId != null) 'class_id': '$classId',
+      });
 
   Future<Map<String, dynamic>> driverStats({required int memberId}) async {
     final uri = Uri.parse('${AppConfig.baseUrl}/api/standings_public_api.php')
@@ -82,8 +83,47 @@ class NdrlMembersService {
   Future<Map<String, dynamic>> profile({
     required int memberId,
     required int seasonId,
-  }) => _request('member.get', {
-    'member_id': '$memberId',
-    'season_id': '$seasonId',
-  });
+  }) =>
+      _request('member.get', {
+        'member_id': '$memberId',
+        'season_id': '$seasonId',
+      });
+
+  Future<String> reportAvatar({
+    required String targetType,
+    required int targetId,
+    required String reason,
+    String notes = '',
+  }) async {
+    final uri = Uri.parse(endpoint).replace(
+      queryParameters: {'action': 'report_avatar'},
+    );
+    final response = await _client
+        .post(
+          uri,
+          headers: const {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'target_type': targetType,
+            'target_id': targetId,
+            'reason': reason,
+            'notes': notes,
+          }),
+        )
+        .timeout(const Duration(seconds: 20));
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic> ||
+        response.statusCode >= 400 ||
+        decoded['ok'] != true) {
+      final msg = decoded is Map ? decoded['error']?.toString() : null;
+      throw StateError(msg ?? 'Unable to submit photo report.');
+    }
+    final data = decoded['data'];
+    if (data is Map && data['message'] is String) {
+      return data['message'] as String;
+    }
+    return 'Report submitted to NDRL officials.';
+  }
 }
