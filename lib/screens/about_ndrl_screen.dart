@@ -68,9 +68,9 @@ class _NdrlAboutScreenState extends State<NdrlAboutScreen> {
     final uri = Uri.parse('${AppConfig.baseUrl}$path');
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
         mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open web page')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Unable to open web page')));
     }
   }
 

@@ -13,14 +13,46 @@ class NdrlOfficialsLaneCallsScreen extends StatefulWidget {
 
 class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
     with WidgetsBindingObserver {
+  // High-contrast daylight palette
+  static const Color _bgPage = Color(0xFFE2E8F0);
+  static const Color _bgCard = Color(0xFFFFFFFF);
+  static const Color _inkPrimary = Color(0xFF0F172A);
+  static const Color _inkSecondary = Color(0xFF334155);
+  static const Color _borderStrong = Color(0xFF0F172A);
+  static const Color _borderMuted = Color(0xFF94A3B8);
+  static const Color _accentPrimary = Color(
+    0xFFB91C1C,
+  ); // High-contrast NDRL Red
+  static const Color _accentSelected = Color(0xFF0F172A);
+  static const Color _accentGold = Color(0xFFFACC15);
+  static const Color _accentSuccess = Color(0xFF15803D);
+
   late final OfficialNotificationsService api = OfficialNotificationsService(
     widget.officials.auth,
   );
-  final round = TextEditingController(text: 'Qualifying 1');
-  final message = TextEditingController(text: 'Please report to staging.');
+
+  final TextEditingController _customMessageController =
+      TextEditingController();
+  bool _useCustomMessage = false;
+
   String roundType = 'Qualifying';
   int roundNumber = 1;
   String stagingInstruction = 'staging';
+  String callType = 'first';
+
+  List<Map<String, dynamic>> events = [];
+  List<Map<String, dynamic>> classes = [];
+  final Set<int> selected = {};
+  int? eventId;
+
+  bool loading = false;
+  String? error;
+  Map<String, dynamic>? preview;
+  Map<String, dynamic>? submission;
+  LaneCallDraft? pendingDraft;
+  String? pendingKey;
+
+  bool get _isLocked => loading || pendingKey != null;
 
   bool get _usesRoundNumber =>
       roundType == 'TT' ||
@@ -28,32 +60,43 @@ class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
       roundType == 'Eliminations';
 
   String get _roundLabel =>
-      _usesRoundNumber ? '$roundType $roundNumber' : roundType;
+      _usesRoundNumber ? '$roundType Round $roundNumber' : roundType;
 
-  String get _generatedMessage => stagingInstruction == 'staging'
-      ? 'Please report to staging.'
-      : 'Please be on deck.';
-
-  void _regenerateMessage() {
-    if (pendingKey != null || loading) return;
-    setState(() {
-      round.text = _roundLabel;
-      message.text = _generatedMessage;
-    });
-    _draftChanged();
+  String get _callTypeLabel {
+    switch (callType) {
+      case 'second':
+        return 'Second Call';
+      case 'final':
+        return 'Final Call';
+      case 'first':
+      default:
+        return 'First Call';
+    }
   }
 
-  List<Map<String, dynamic>> events = [];
-  List<Map<String, dynamic>> classes = [];
-  final Set<int> selected = {};
-  int? eventId;
-  String callType = 'first';
-  bool loading = false;
-  String? error;
-  Map<String, dynamic>? preview;
-  Map<String, dynamic>? submission;
-  LaneCallDraft? pendingDraft;
-  String? pendingKey;
+  String get _instructionPhrase {
+    return stagingInstruction == 'deck'
+        ? 'Report on deck'
+        : 'Report to staging lanes';
+  }
+
+  List<String> get _selectedClassNames {
+    return classes
+        .where((c) => selected.contains(c['class_id']))
+        .map((c) => '${c['name']}'.trim())
+        .where((name) => name.isNotEmpty)
+        .toList();
+  }
+
+  String get _formattedLiveMessage {
+    if (_useCustomMessage && _customMessageController.text.trim().isNotEmpty) {
+      return _customMessageController.text.trim();
+    }
+    final classPart = _selectedClassNames.isEmpty
+        ? '[Select Class]'
+        : _selectedClassNames.join(', ');
+    return '$classPart - $_callTypeLabel - $_instructionPhrase for $_roundLabel';
+  }
 
   @override
   void initState() {
@@ -92,8 +135,7 @@ class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.officials.removeListener(_permissionsChanged);
-    round.dispose();
-    message.dispose();
+    _customMessageController.dispose();
     super.dispose();
   }
 
@@ -120,12 +162,9 @@ class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
                 access.eventIds.contains(e['event_id']),
           )
           .toList();
-      // The backend Targets API already returns the classes
-      // this official is authorized to manage.
-      final filteredClasses = nextClasses;
       setState(() {
         events = filteredEvents;
-        classes = filteredClasses;
+        classes = nextClasses;
         if (!events.any((e) => e['event_id'] == eventId)) {
           eventId = events.isEmpty ? null : events.first['event_id'] as int?;
         }
@@ -162,16 +201,17 @@ class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
     eventId: eventId!,
     classIds: selected.toList()..sort(),
     callType: callType,
-    roundLabel: round.text.trim(),
-    message: message.text.trim(),
+    roundLabel: _roundLabel,
+    message: _formattedLiveMessage,
   );
 
-  Future<void> _preview() async {
-    if (eventId == null || selected.isEmpty || pendingKey != null) return;
+  Future<void> _stageAndVerifyRecipients() async {
+    if (eventId == null || selected.isEmpty || _isLocked) return;
     setState(() {
       loading = true;
       error = null;
       preview = null;
+      submission = null;
     });
     try {
       await widget.officials.refresh();
@@ -195,30 +235,10 @@ class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
     }
   }
 
-  Future<void> _send() async {
+  Future<void> _broadcastNow() async {
     final draft = pendingDraft;
     if (draft == null || preview == null || loading) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm lane call'),
-        content: Text(
-          '${preview!['title']}\n\n${preview!['body']}\n\n'
-          'This will queue a real DEV notification for the selected classes.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm & Send'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+
     setState(() {
       loading = true;
       error = null;
@@ -228,7 +248,6 @@ class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
       if (!widget.officials.access.canCallLanes) {
         throw StateError('Access revoked');
       }
-      // Retain the exact draft and UUID after uncertain network failures.
       pendingKey ??= OfficialNotificationsService.newSubmissionKey();
       final result = await api.sendLaneCall(draft, idempotencyKey: pendingKey!);
       if (!mounted) return;
@@ -242,8 +261,8 @@ class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
       if (mounted) {
         setState(
           () => error =
-              'Submission result uncertain or rejected: $e. Do not change the draft; '
-              'retry with the same submission ID only after checking history.',
+              'Send uncertain or rejected: $e. Do not change selections; '
+              'tap RETRY SEND to reuse the same submission ID safely.',
         );
       }
     } finally {
@@ -254,264 +273,830 @@ class _LaneCallsState extends State<NdrlOfficialsLaneCallsScreen>
   @override
   Widget build(BuildContext context) {
     final access = widget.officials.access;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Staging Lane Calls'),
-        actions: [
-          IconButton(
-            onPressed: loading || pendingKey != null ? null : _reload,
-            tooltip: 'Refresh access and targets',
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+    return Theme(
+      data: ThemeData.light().copyWith(
+        scaffoldBackgroundColor: _bgPage,
+        colorScheme: const ColorScheme.light(
+          primary: _inkPrimary,
+          secondary: _accentPrimary,
+          surface: _bgCard,
+        ),
       ),
-      body: widget.officials.loading
-          ? const Center(child: CircularProgressIndicator())
-          : !access.enabled
-          ? Center(
-              child: Text(
-                widget.officials.error ?? 'Official access unavailable.',
-              ),
-            )
-          : !access.canCallLanes
-          ? const Center(child: Text('Lane-call permission unavailable.'))
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text(
-                  'Roles: ${access.roles.join(', ')}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: SelectableText(
-                      error!,
-                      style: const TextStyle(color: Colors.orange),
-                    ),
-                  ),
-                if (loading) const LinearProgressIndicator(),
-                const SizedBox(height: 12),
-                if (access.canCallLanes) ...[
-                  DropdownButtonFormField<int>(
-                    key: ValueKey(eventId),
-                    initialValue: eventId,
-                    decoration: const InputDecoration(
-                      labelText: 'Authorized event',
-                    ),
-                    items: events
-                        .map(
-                          (e) => DropdownMenuItem<int>(
-                            value: e['event_id'] as int,
-                            child: Text('${e['name']}'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: loading || pendingKey != null
-                        ? null
-                        : (value) {
-                            setState(() {
-                              eventId = value;
-                            });
-                            _draftChanged();
-                          },
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                if (access.canCallLanes) _laneControls(),
-              ],
+      child: Scaffold(
+        backgroundColor: _bgPage,
+        appBar: AppBar(
+          backgroundColor: _inkPrimary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          title: const Text(
+            'STAGING LANE CONTROL',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              letterSpacing: 0.8,
             ),
+          ),
+          actions: [
+            IconButton(
+              onPressed: _isLocked ? null : _reload,
+              tooltip: 'Refresh classes & events',
+              icon: const Icon(Icons.refresh, size: 28),
+            ),
+          ],
+        ),
+        body: widget.officials.loading
+            ? const Center(child: CircularProgressIndicator(strokeWidth: 4))
+            : !access.enabled
+            ? _statusMessage(
+                widget.officials.error ?? 'Official access unavailable.',
+              )
+            : !access.canCallLanes
+            ? _statusMessage('Lane-call permission unavailable.')
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+                children: [
+                  if (loading)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: LinearProgressIndicator(minHeight: 6),
+                    ),
+                  _eventHeaderCard(access),
+                  if (error != null) _errorBanner(error!),
+                  const SizedBox(height: 12),
+                  _step1ClassesCard(),
+                  const SizedBox(height: 12),
+                  _step2CallDetailsCard(),
+                  const SizedBox(height: 12),
+                  _step3LivePreviewAndSendCard(),
+                ],
+              ),
+      ),
     );
   }
 
-  Widget _laneControls() => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
+  Widget _statusMessage(String text) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: _inkPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _errorBanner(String msg) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        border: Border.all(color: _accentPrimary, width: 2),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: _accentPrimary,
+            size: 28,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: SelectableText(
+              msg,
+              style: const TextStyle(
+                color: Color(0xFF7F1D1D),
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _eventHeaderCard(dynamic access) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _bgCard,
+        border: Border.all(color: _borderStrong, width: 2),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Staging Lane Calls',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          if (classes.isEmpty) const Text('No authorized classes available.'),
-          ...classes.map(
-            (c) => CheckboxListTile(
-              dense: true,
-              title: Text('${c['name']}'),
-              value: selected.contains(c['class_id']),
-              onChanged: loading || pendingKey != null
-                  ? null
-                  : (checked) {
-                      setState(() {
-                        if (checked == true) {
-                          selected.add(c['class_id'] as int);
-                        } else {
-                          selected.remove(c['class_id']);
-                        }
-                      });
-                      _draftChanged();
-                    },
-            ),
-          ),
-          DropdownButtonFormField<String>(
-            initialValue: callType,
-            decoration: const InputDecoration(labelText: 'Call type'),
-            items: const [
-              DropdownMenuItem(value: 'first', child: Text('First Call')),
-              DropdownMenuItem(value: 'second', child: Text('Second Call')),
-              DropdownMenuItem(value: 'final', child: Text('Final Call')),
-            ],
-            onChanged: loading || pendingKey != null
-                ? null
-                : (v) {
-                    if (v != null) {
-                      callType = v;
-                      _draftChanged();
-                    }
-                  },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: roundType,
-            decoration: const InputDecoration(labelText: 'Round type'),
-            items: const [
-              DropdownMenuItem(value: 'TT', child: Text('TT')),
-              DropdownMenuItem(value: 'Qualifying', child: Text('Qualifying')),
-              DropdownMenuItem(
-                value: 'Eliminations',
-                child: Text('Elimination Rounds'),
-              ),
-              DropdownMenuItem(value: 'Semi Final', child: Text('Semi Final')),
-              DropdownMenuItem(value: 'Final', child: Text('Final')),
-            ],
-            onChanged: loading || pendingKey != null
-                ? null
-                : (value) {
-                    if (value == null) return;
-                    roundType = value;
-                    _regenerateMessage();
-                  },
-          ),
-          if (_usesRoundNumber) ...[
-            const SizedBox(height: 12),
-            DropdownButtonFormField<int>(
-              key: ValueKey(roundType),
-              initialValue: roundNumber,
-              decoration: const InputDecoration(labelText: 'Round number'),
-              items: List.generate(
-                8,
-                (index) => DropdownMenuItem<int>(
-                  value: index + 1,
-                  child: Text('${index + 1}'),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: _accentGold,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: _inkPrimary, width: 1.5),
+                ),
+                child: Text(
+                  'ROLE: ${access.roles.join(', ').toUpperCase()}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: _inkPrimary,
+                  ),
                 ),
               ),
-              onChanged: loading || pendingKey != null
-                  ? null
-                  : (value) {
-                      if (value == null) return;
-                      roundNumber = value;
-                      _regenerateMessage();
-                    },
-            ),
-          ],
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: stagingInstruction,
-            decoration: const InputDecoration(labelText: 'Lane instruction'),
-            items: const [
-              DropdownMenuItem(
-                value: 'staging',
-                child: Text('Report to Staging'),
+              const Spacer(),
+              Text(
+                '${selected.length} CLASS${selected.length == 1 ? '' : 'ES'} SELECTED',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: selected.isEmpty ? _inkSecondary : _accentPrimary,
+                ),
               ),
-              DropdownMenuItem(value: 'deck', child: Text('On Deck')),
             ],
-            onChanged: loading || pendingKey != null
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'ACTIVE EVENT',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: _inkSecondary,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 4),
+          DropdownButtonFormField<int>(
+            key: ValueKey(eventId),
+            initialValue: eventId,
+            isExpanded: true,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: _inkPrimary,
+            ),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 14,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _borderStrong, width: 2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _accentPrimary, width: 2.5),
+              ),
+            ),
+            items: events
+                .map(
+                  (e) => DropdownMenuItem<int>(
+                    value: e['event_id'] as int,
+                    child: Text(
+                      '${e['name']}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: _isLocked
                 ? null
                 : (value) {
-                    if (value == null) return;
-                    stagingInstruction = value;
-                    _regenerateMessage();
+                    setState(() => eventId = value);
+                    _draftChanged();
                   },
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: round,
-            decoration: const InputDecoration(
-              labelText: 'Round label',
-              helperText: 'Generated from the round selectors',
-            ),
-            readOnly: true,
+        ],
+      ),
+    );
+  }
+
+  Widget _step1ClassesCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _bgCard,
+        border: Border.all(color: _borderStrong, width: 2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '1. TAP CLASSES TO CALL',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: _inkPrimary,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              if (selected.isNotEmpty)
+                OutlinedButton(
+                  onPressed: _isLocked
+                      ? null
+                      : () {
+                          setState(() => selected.clear());
+                          _draftChanged();
+                        },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _inkPrimary,
+                    side: const BorderSide(color: _inkPrimary, width: 1.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                  child: const Text(
+                    'CLEAR ALL',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: message,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Message body (editable)',
-              helperText: 'Changing a dropdown regenerates this message',
-            ),
-            readOnly: loading || pendingKey != null,
-            onChanged: (_) => _draftChanged(),
-          ),
-          TextButton.icon(
-            onPressed: loading || pendingKey != null
-                ? null
-                : _regenerateMessage,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Regenerate message'),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed:
-                loading ||
-                    pendingKey != null ||
-                    eventId == null ||
-                    selected.isEmpty
-                ? null
-                : _preview,
-            icon: const Icon(Icons.visibility),
-            label: const Text('Preview lane call'),
-          ),
-          if (preview != null) ...[
-            const Divider(),
-            Text(
-              '${preview!['title']}',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            Text('${preview!['body']}'),
-            const SizedBox(height: 8),
-            Text(
-              'Classes: ${_maps(preview!['classes']).map((c) => c['name']).join(', ')}',
-            ),
-            Text(
-              'Unique matching devices: ${preview!['recipients']?['unique_matching_devices'] ?? '?'}',
-            ),
-            Text(
-              'Unique push-ready devices: ${preview!['recipients']?['unique_push_ready_devices'] ?? '?'}',
-            ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: loading ? null : _send,
-              icon: const Icon(Icons.send),
-              label: const Text('Review & Confirm Send'),
-            ),
-          ],
-          if (submission != null) ...[
-            const Divider(),
-            const Text(
-              'Submission accepted by API. Push delivery is asynchronous.',
-            ),
-            SelectableText('$submission'),
-          ],
-          if (pendingKey != null && preview != null)
-            const Text(
-              'Retry will reuse the same submission ID.',
-              style: TextStyle(color: Colors.orange),
+          const SizedBox(height: 10),
+          if (classes.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No authorized classes available.',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = (constraints.maxWidth - 10) / 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: classes.map((c) {
+                    final id = c['class_id'] as int;
+                    final name = '${c['name']}';
+                    final isSelected = selected.contains(id);
+                    return SizedBox(
+                      width: itemWidth,
+                      height: 60,
+                      child: Material(
+                        color: isSelected ? _accentSelected : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: _isLocked
+                              ? null
+                              : () {
+                                  setState(() {
+                                    if (isSelected) {
+                                      selected.remove(id);
+                                    } else {
+                                      selected.add(id);
+                                    }
+                                  });
+                                  _draftChanged();
+                                },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected ? _accentGold : _borderStrong,
+                                width: isSelected ? 3 : 2,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected
+                                      ? Icons.check_box
+                                      : Icons.check_box_outline_blank,
+                                  color: isSelected ? _accentGold : _inkPrimary,
+                                  size: 26,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : _inkPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
             ),
         ],
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _step2CallDetailsCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _bgCard,
+        border: Border.all(color: _borderStrong, width: 2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '2. CALL LEVEL & ACTION',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: _inkPrimary,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _bigChoiceButton(
+                label: 'FIRST CALL',
+                selected: callType == 'first',
+                activeColor: _accentSuccess,
+                onTap: () {
+                  setState(() => callType = 'first');
+                  _draftChanged();
+                },
+              ),
+              const SizedBox(width: 8),
+              _bigChoiceButton(
+                label: 'SECOND CALL',
+                selected: callType == 'second',
+                activeColor: const Color(0xFFD97706),
+                onTap: () {
+                  setState(() => callType = 'second');
+                  _draftChanged();
+                },
+              ),
+              const SizedBox(width: 8),
+              _bigChoiceButton(
+                label: 'FINAL CALL',
+                selected: callType == 'final',
+                activeColor: _accentPrimary,
+                onTap: () {
+                  setState(() => callType = 'final');
+                  _draftChanged();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _bigChoiceButton(
+                label: 'REPORT TO STAGING',
+                selected: stagingInstruction == 'staging',
+                activeColor: _accentSelected,
+                onTap: () {
+                  setState(() => stagingInstruction = 'staging');
+                  _draftChanged();
+                },
+              ),
+              const SizedBox(width: 8),
+              _bigChoiceButton(
+                label: 'ON DECK',
+                selected: stagingInstruction == 'deck',
+                activeColor: _accentSelected,
+                onTap: () {
+                  setState(() => stagingInstruction = 'deck');
+                  _draftChanged();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'ROUND / SESSION',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: _inkSecondary,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final entry in const {
+                'TT': 'Time Trial',
+                'Qualifying': 'Qualifying',
+                'Eliminations': 'Eliminations',
+                'Semi Final': 'Semi Final',
+                'Final': 'Final',
+              }.entries)
+                _pillButton(
+                  label: entry.value,
+                  selected: roundType == entry.key,
+                  onTap: () {
+                    setState(() => roundType = entry.key);
+                    _draftChanged();
+                  },
+                ),
+            ],
+          ),
+          if (_usesRoundNumber) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'ROUND NUMBER',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: _inkSecondary,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: List.generate(8, (index) {
+                final num = index + 1;
+                final isSelected = roundNumber == num;
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: index == 7 ? 0 : 6),
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _isLocked
+                            ? null
+                            : () {
+                                setState(() => roundNumber = num);
+                                _draftChanged();
+                              },
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          elevation: 0,
+                          backgroundColor: isSelected
+                              ? _accentSelected
+                              : Colors.white,
+                          foregroundColor: isSelected
+                              ? Colors.white
+                              : _inkPrimary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(
+                              color: isSelected ? _accentGold : _borderStrong,
+                              width: isSelected ? 2.5 : 1.5,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          '$num',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _step3LivePreviewAndSendCard() {
+    final canStage = !_isLocked && eventId != null && selected.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _bgCard,
+        border: Border.all(color: _borderStrong, width: 2.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '3. LIVE MESSAGE PREVIEW',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: _inkPrimary,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _isLocked
+                    ? null
+                    : () {
+                        setState(() {
+                          _useCustomMessage = !_useCustomMessage;
+                          if (_useCustomMessage &&
+                              _customMessageController.text.trim().isEmpty) {
+                            _customMessageController.text =
+                                _formattedLiveMessage;
+                          }
+                        });
+                        _draftChanged();
+                      },
+                icon: Icon(
+                  _useCustomMessage ? Icons.auto_fix_high : Icons.edit,
+                  size: 18,
+                  color: _inkPrimary,
+                ),
+                label: Text(
+                  _useCustomMessage ? 'USE AUTO TEXT' : 'EDIT TEXT',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: _inkPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF9C3),
+              border: Border.all(color: _inkPrimary, width: 2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'NDRL — $_callTypeLabel'.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: _accentPrimary,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _formattedLiveMessage,
+                  style: const TextStyle(
+                    fontSize: 19,
+                    height: 1.3,
+                    fontWeight: FontWeight.w900,
+                    color: _inkPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_useCustomMessage) ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _customMessageController,
+              maxLines: 3,
+              readOnly: _isLocked,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: _inkPrimary,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Custom Message Override',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: _borderStrong, width: 2),
+                ),
+              ),
+              onChanged: (_) => _draftChanged(),
+            ),
+          ],
+          const SizedBox(height: 14),
+          if (preview == null)
+            SizedBox(
+              height: 60,
+              child: ElevatedButton.icon(
+                onPressed: canStage ? _stageAndVerifyRecipients : null,
+                icon: const Icon(Icons.fact_check, size: 26),
+                label: Text(
+                  selected.isEmpty
+                      ? 'SELECT AT LEAST 1 CLASS ABOVE'
+                      : 'VERIFY RECIPIENTS & STAGE CALL',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _inkPrimary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: _borderMuted,
+                  disabledForegroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          if (preview != null) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                border: Border.all(color: _accentSuccess, width: 2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'READY TO BROADCAST',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: _accentSuccess,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Classes: ${_maps(preview!['classes']).map((c) => c['name']).join(', ')}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: _inkPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Push-ready devices: ${preview!['recipients']?['unique_push_ready_devices'] ?? '?'} '
+                    '(${preview!['recipients']?['unique_matching_devices'] ?? '?'} subscribed)',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _inkSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 64,
+              child: ElevatedButton.icon(
+                onPressed: loading ? null : _broadcastNow,
+                icon: const Icon(Icons.campaign, size: 30),
+                label: Text(
+                  pendingKey != null ? 'RETRY BROADCAST NOW' : 'SEND CALL NOW',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (submission != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                border: Border.all(color: _accentSuccess, width: 2.5),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: _accentSuccess,
+                    size: 32,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'CALL SENT! Queued ${submission!['delivery_records'] ?? 0} device deliveries.',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: _inkPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _bigChoiceButton({
+    required String label,
+    required bool selected,
+    required Color activeColor,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: SizedBox(
+        height: 54,
+        child: ElevatedButton(
+          onPressed: _isLocked ? null : onTap,
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            elevation: 0,
+            backgroundColor: selected ? activeColor : Colors.white,
+            foregroundColor: selected ? Colors.white : _inkPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(
+                color: selected ? _inkPrimary : _borderStrong,
+                width: selected ? 2.5 : 1.5,
+              ),
+            ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pillButton({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      height: 46,
+      child: ElevatedButton(
+        onPressed: _isLocked ? null : onTap,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          elevation: 0,
+          backgroundColor: selected ? _accentSelected : Colors.white,
+          foregroundColor: selected ? Colors.white : _inkPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+              color: selected ? _accentGold : _borderStrong,
+              width: selected ? 2.5 : 1.5,
+            ),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+        ),
+      ),
+    );
+  }
 }
