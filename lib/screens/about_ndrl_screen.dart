@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/app_config.dart';
 import '../services/about_ndrl_service.dart';
 
 const _bg = Color(0xFF111111);
@@ -63,6 +64,16 @@ class _NdrlAboutScreenState extends State<NdrlAboutScreen> {
     }
   }
 
+  Future<void> _openWebUrl(String path) async {
+    final uri = Uri.parse('${AppConfig.baseUrl}$path');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open web page')),
+      );
+    }
+  }
+
   Widget _contact(Map<String, dynamic> contact) {
     final name = (contact['display_name'] ?? '').toString();
     final role = (contact['role_title'] ?? '').toString();
@@ -105,6 +116,40 @@ class _NdrlAboutScreenState extends State<NdrlAboutScreen> {
     );
   }
 
+  Widget _legalAndSupportCard() => _section(
+    'LEGAL & SUPPORT',
+    Column(
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.privacy_tip_outlined, color: _gold),
+          title: const Text('Privacy Policy'),
+          subtitle: const Text('How NDRL collects and protects member data'),
+          trailing: const Icon(Icons.open_in_new, size: 18),
+          onTap: () => _openWebUrl('/pages/privacy.php'),
+        ),
+        const Divider(color: Colors.white12, height: 1),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.gavel_outlined, color: _gold),
+          title: const Text('Terms of Use'),
+          subtitle: const Text('Community guidelines and league app terms'),
+          trailing: const Icon(Icons.open_in_new, size: 18),
+          onTap: () => _openWebUrl('/pages/terms.php'),
+        ),
+        const Divider(color: Colors.white12, height: 1),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.manage_accounts_outlined, color: _gold),
+          title: const Text('Account Deletion & Support'),
+          subtitle: const Text('Manage or request account deletion online'),
+          trailing: const Icon(Icons.open_in_new, size: 18),
+          onTap: () => _openWebUrl('/pages/account-deletion.php'),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: _bg,
@@ -126,18 +171,20 @@ class _NdrlAboutScreenState extends State<NdrlAboutScreen> {
           return const Center(child: CircularProgressIndicator(color: _red));
         }
         if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Unable to load About NDRL.'),
-                  const SizedBox(height: 12),
-                  FilledButton(onPressed: _refresh, child: const Text('Retry')),
-                ],
+          return ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              const Center(child: Text('Unable to load About NDRL.')),
+              const SizedBox(height: 12),
+              Center(
+                child: FilledButton(
+                  onPressed: _refresh,
+                  child: const Text('Retry'),
+                ),
               ),
-            ),
+              const SizedBox(height: 20),
+              _legalAndSupportCard(),
+            ],
           );
         }
         final data = snapshot.data!;
@@ -208,6 +255,7 @@ class _NdrlAboutScreenState extends State<NdrlAboutScreen> {
                     style: const TextStyle(color: Colors.white70),
                   ),
                 ),
+              _legalAndSupportCard(),
             ],
           ),
         );

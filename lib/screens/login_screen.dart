@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../config/app_config.dart';
 import '../services/auth_service.dart';
 import 'app_shell.dart';
 
@@ -23,6 +25,16 @@ class _NdrlLoginScreenState extends State<NdrlLoginScreen> {
     _email.dispose();
     _pin.dispose();
     super.dispose();
+  }
+
+  Future<void> _openWebUrl(String path) async {
+    final uri = Uri.parse('${AppConfig.baseUrl}$path');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open web page')),
+      );
+    }
   }
 
   Future<void> _run(Future<void> Function() task) async {
@@ -203,7 +215,7 @@ class _NdrlLoginScreenState extends State<NdrlLoginScreen> {
     if (mounted && emailCtrl.text.trim().isNotEmpty) {
       _email.text = emailCtrl.text.trim();
     }
-    emailCtrl.dispose();
+    Future<void>.delayed(const Duration(milliseconds: 400), emailCtrl.dispose);
   }
 
   @override
@@ -317,6 +329,28 @@ class _NdrlLoginScreenState extends State<NdrlLoginScreen> {
               'Forgot PIN?',
               style: TextStyle(color: Colors.white70),
             ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () => _openWebUrl('/pages/privacy.php'),
+                child: const Text(
+                  'Privacy Policy',
+                  style: TextStyle(color: Colors.white60, fontSize: 12),
+                ),
+              ),
+              const Text('·', style: TextStyle(color: Colors.white38)),
+              TextButton(
+                onPressed: () => _openWebUrl('/pages/terms.php'),
+                child: const Text(
+                  'Terms of Use',
+                  style: TextStyle(color: Colors.white60, fontSize: 12),
+                ),
+              ),
+            ],
           ),
         ],
       ),
